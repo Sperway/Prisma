@@ -35,7 +35,7 @@ services:
     pids_limit: 256
     depends_on:
       lavalink:
-        condition: service_started
+        condition: service_healthy
 
   lavalink:
     <<: *hardening
