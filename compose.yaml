@@ -1,0 +1,33 @@
+# Prisma corre en una VPS compartida con otro proyecto crítico.
+# Todo lo de acá está pensado para que Prisma NUNCA pueda afectarlo:
+#   - Proyecto, red y volúmenes propios (nombre "prisma").
+#   - Sin puertos publicados: el bot solo hace conexiones salientes.
+#   - Límites duros de memoria, CPU y procesos.
+#   - oom_score_adj alto: si el servidor se queda sin RAM, el kernel mata primero a Prisma.
+# Ver docs/adr/0003-aislamiento-en-la-vps.md
+
+name: prisma
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ['no-new-privileges:true']
+  cap_drop: [ALL]
+  oom_score_adj: 800
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  bot:
+    <<: *hardening
+    build: .
+    image: prisma-bot:latest
+    env_file: .env
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
