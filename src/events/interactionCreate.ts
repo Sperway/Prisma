@@ -16,6 +16,18 @@ export async function handleInteraction(interaction: Interaction, ctx: BotContex
     return;
   }
 
+  if (interaction.isAutocomplete()) {
+    const command = ctx.commands.get(interaction.commandName);
+    try {
+      await command?.autocomplete?.(interaction, ctx);
+    } catch (error) {
+      ctx.logger.warn({ err: error, command: interaction.commandName }, 'Error en autocompletado');
+    }
+    // Si no se respondió (o falló), se responde vacío para que Discord no muestre un error.
+    if (!interaction.responded) await interaction.respond([]).catch(() => undefined);
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const command = ctx.commands.get(interaction.commandName);

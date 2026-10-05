@@ -16,10 +16,15 @@ export const play: Command = {
     .addStringOption((option) =>
       option
         .setName('consulta')
-        .setDescription('Nombre del tema o enlace')
+        .setDescription('Escribí para ver resultados, o pegá un enlace')
         .setRequired(true)
-        .setMaxLength(MAX_QUERY_LENGTH),
+        .setMaxLength(MAX_QUERY_LENGTH)
+        .setAutocomplete(true),
     ),
+
+  async autocomplete(interaction, ctx) {
+    await interaction.respond(await ctx.suggest(interaction.options.getFocused()));
+  },
 
   async execute(raw, ctx) {
     const interaction = await requireGuild(raw);

@@ -27,6 +27,10 @@ Para usar la música tenés que estar en un canal de voz. Para controlar algo qu
 | `/repetir modo`    | Desactivado, tema actual o toda la cola                  |
 | `/mezclar`         | Mezcla la cola al azar                                   |
 
+### Búsqueda con sugerencias
+
+Al escribir `/play`, Prisma muestra hasta 10 resultados de SoundCloud mientras tipeás (por ejemplo, `/play fito`). Elegí uno de la lista para reproducir exactamente ese tema, o apretá Enter para reproducir el primer resultado. Si pegás un enlace, no se muestran sugerencias.
+
 ### Panel de control
 
 Cada vez que arranca un tema, Prisma publica un panel con botones:
