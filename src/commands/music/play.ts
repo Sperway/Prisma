@@ -1,7 +1,9 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import type { Track, UnresolvedTrack } from 'lavalink-client';
 import { isYouTubeUrl, parseUrl, truncate } from '../../music/format.js';
 import { replyError, requireGuild } from '../../music/guards.js';
 import { toRequester, trackLink } from '../../music/panel.js';
+import { parseSpotifyLink } from '../../music/spotify.js';
 import { brandEmbed } from '../../ui/embeds.js';
 import type { Command } from '../types.js';
 
@@ -35,6 +37,19 @@ export const play: Command = {
       await replyError(
         interaction,
         'YouTube no está disponible en Prisma. Probá con el nombre del tema o un enlace de SoundCloud, Spotify o Bandcamp.',
+      );
+      return;
+    }
+
+    const spotifyLink = url ? parseSpotifyLink(url) : null;
+    if (spotifyLink && !ctx.spotify) {
+      await replyError(interaction, 'Los enlaces de Spotify no están activados.');
+      return;
+    }
+    if (spotifyLink?.type === 'playlist' || spotifyLink?.type === 'artist') {
+      await replyError(
+        interaction,
+        'Spotify ya no permite que los bots lean playlists ni artistas. Probá con un tema o un álbum de Spotify, o con una playlist de SoundCloud.',
       );
       return;
     }
@@ -76,44 +91,70 @@ export const play: Command = {
       });
     if (!player.connected) await player.connect();
 
-    const result = await player.search({ query }, toRequester(interaction.user));
+    const requester = toRequester(interaction.user);
+    let tracks: (Track | UnresolvedTrack)[] = [];
+    let collectionName: string | null = null;
+    let failed = false;
 
-    if (result.loadType === 'error' || result.loadType === 'empty' || result.tracks.length === 0) {
+    if (spotifyLink?.type === 'album' && ctx.spotify) {
+      // LavaSrc no puede cargar álbumes con la API actual de Spotify: se leen acá y cada tema
+      // se resuelve (Spotify → SoundCloud) recién cuando le toca sonar.
+      try {
+        const album = await ctx.spotify.getAlbum(spotifyLink.id);
+        collectionName = `${album.name} — ${album.artist}`;
+        tracks = album.tracks.map((track) =>
+          ctx.music.utils.buildUnresolvedTrack(
+            {
+              title: track.title,
+              author: track.author,
+              duration: track.durationMs,
+              uri: `https://open.spotify.com/track/${track.id}`,
+              artworkUrl: album.artworkUrl,
+              sourceName: 'spotify',
+            },
+            requester,
+          ),
+        );
+      } catch (error) {
+        ctx.logger.warn(
+          { err: error, album: spotifyLink.id },
+          'No se pudo cargar el álbum de Spotify',
+        );
+        failed = true;
+      }
+    } else {
+      const result = await player.search({ query }, requester);
+      failed = result.loadType === 'error';
+      if (result.loadType === 'playlist') {
+        tracks = result.tracks;
+        collectionName = result.playlist?.name ?? 'la playlist';
+      } else {
+        tracks = result.tracks.slice(0, 1);
+      }
+    }
+
+    if (tracks.length === 0) {
       if (!player.queue.current) await player.destroy('Búsqueda sin resultados');
-      const reason =
-        result.loadType === 'error'
+      await replyError(
+        interaction,
+        failed
           ? 'No pude cargar eso. Revisá el enlace o probá con otra búsqueda.'
-          : `No encontré resultados para **${truncate(query, 100)}**.`;
-      await replyError(interaction, reason);
+          : `No encontré resultados para **${truncate(query, 100)}**.`,
+      );
       return;
     }
 
     const wasIdle = !player.playing && !player.queue.current;
+    await player.queue.add(tracks);
 
-    if (result.loadType === 'playlist') {
-      await player.queue.add(result.tracks);
-      await interaction.editReply({
-        embeds: [
-          brandEmbed().setDescription(
-            `📃 Agregué **${result.tracks.length} temas** de **${truncate(result.playlist?.name ?? 'la playlist', 80)}**.`,
-          ),
-        ],
-      });
-    } else {
-      const [track] = result.tracks;
-      if (!track) return;
-      await player.queue.add(track);
-      const position = player.queue.tracks.length;
-      await interaction.editReply({
-        embeds: [
-          brandEmbed().setDescription(
-            wasIdle
-              ? `▶️ Reproduciendo **${trackLink(track)}**`
-              : `➕ Agregué **${trackLink(track)}** a la cola (posición ${position}).`,
-          ),
-        ],
-      });
-    }
+    const [first] = tracks;
+    const description =
+      collectionName !== null
+        ? `📃 Agregué **${tracks.length} temas** de **${truncate(collectionName, 80)}**.`
+        : wasIdle
+          ? `▶️ Reproduciendo **${first ? trackLink(first) : ''}**`
+          : `➕ Agregué **${first ? trackLink(first) : ''}** a la cola (posición ${player.queue.tracks.length}).`;
+    await interaction.editReply({ embeds: [brandEmbed().setDescription(description)] });
 
     if (wasIdle) await player.play();
   },

@@ -41,16 +41,17 @@ Cada vez que arranca un tema, Prisma publica un panel con botones:
 
 ### Qué se puede reproducir
 
-| Fuente     | Búsqueda por nombre | Enlaces                                      |
-| ---------- | ------------------- | -------------------------------------------- |
-| SoundCloud | ✅ (por defecto)    | Temas, playlists, perfiles                   |
-| Spotify    | —                   | Temas, álbumes, playlists (si está activado) |
-| Bandcamp   | —                   | Temas y álbumes                              |
-| Twitch     | —                   | Transmisiones en vivo                        |
-| Vimeo      | —                   | Videos                                       |
+| Fuente     | Búsqueda por nombre | Enlaces                                    |
+| ---------- | ------------------- | ------------------------------------------ |
+| SoundCloud | ✅ (por defecto)    | Temas, playlists, perfiles                 |
+| Spotify    | —                   | Temas y álbumes (no playlists ni artistas) |
+| Bandcamp   | —                   | Temas y álbumes                            |
+| Twitch     | —                   | Transmisiones en vivo                      |
+| Vimeo      | —                   | Videos                                     |
 
 - **YouTube no está disponible**, por decisión del proyecto.
 - Los enlaces de Spotify se reproducen buscando el mismo tema en SoundCloud, así que puede haber diferencias de versión.
+- Las **playlists y artistas de Spotify no funcionan**: desde febrero de 2026 Spotify no deja que los bots lean su contenido. Como alternativa, usá playlists de SoundCloud.
 - Los temas exclusivos de SoundCloud Go+ se descartan, porque solo dan un fragmento de 30 segundos.
 
 ### Salida automática
