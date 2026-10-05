@@ -3,7 +3,7 @@ import type { Track, UnresolvedTrack } from 'lavalink-client';
 import { isYouTubeUrl, parseUrl, truncate } from '../../music/format.js';
 import { replyError, requireGuild } from '../../music/guards.js';
 import { toRequester, trackLink } from '../../music/panel.js';
-import { parseSpotifyLink } from '../../music/spotify.js';
+import { parseSpotifyLink, spotifyTrackUrl } from '../../music/spotify.js';
 import { brandEmbed } from '../../ui/embeds.js';
 import type { Command } from '../types.js';
 
@@ -113,7 +113,7 @@ export const play: Command = {
               title: track.title,
               author: track.author,
               duration: track.durationMs,
-              uri: `https://open.spotify.com/track/${track.id}`,
+              uri: spotifyTrackUrl(track.id),
               artworkUrl: album.artworkUrl,
               sourceName: 'spotify',
             },
@@ -128,7 +128,9 @@ export const play: Command = {
         failed = true;
       }
     } else {
-      const result = await player.search({ query }, requester);
+      // Texto libre: se elige el mejor resultado (catálogo de Spotify si está activo).
+      const target = url ? query : ((await ctx.search(query))[0]?.url ?? query);
+      const result = await player.search({ query: target }, requester);
       failed = result.loadType === 'error';
       if (result.loadType === 'playlist') {
         tracks = result.tracks;

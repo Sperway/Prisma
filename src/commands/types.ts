@@ -7,7 +7,7 @@ import type { Config } from '../config.js';
 import type { Logger } from '../logger.js';
 import type { MusicManager } from '../music/manager.js';
 import type { SpotifyClient } from '../music/spotify.js';
-import type { SuggestionProvider } from '../music/suggestions.js';
+import type { Search, SuggestionProvider } from '../music/suggestions.js';
 
 /** Dependencias compartidas que reciben todos los comandos. */
 export interface BotContext {
@@ -16,6 +16,8 @@ export interface BotContext {
   music: MusicManager;
   /** null si Spotify no está configurado. */
   spotify: SpotifyClient | null;
+  /** Búsqueda de temas: Spotify primero, SoundCloud como respaldo. */
+  search: Search;
   suggest: SuggestionProvider;
   startedAt: Date;
   commands: ReadonlyMap<string, Command>;

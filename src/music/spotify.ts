@@ -1,7 +1,9 @@
 /**
  * Cliente mínimo de la Web API de Spotify (credenciales de aplicación).
  *
- * Existe porque, desde las restricciones de febrero de 2026, LavaSrc no puede cargar álbumes:
+ * Se usa para dos cosas:
+ * - Buscar temas en el catálogo de Spotify (sugerencias de /play), mucho más completo que SoundCloud.
+ * - Cargar álbumes. Existe porque, desde las restricciones de febrero de 2026, LavaSrc no puede cargar álbumes:
  * usa el endpoint de búsqueda en lote (GET /tracks?ids=), que Spotify eliminó. Acá leemos el
  * álbum con los endpoints que siguen disponibles y cada tema se resuelve recién al sonar.
  * Ver docs/adr/0005-fuentes-de-musica.md.
@@ -11,6 +13,12 @@ const ACCOUNTS_URL = 'https://accounts.spotify.com/api/token';
 const API_URL = 'https://api.spotify.com/v1';
 /** Tope de temas por álbum (los álbumes más largos se cortan acá). */
 export const MAX_ALBUM_TRACKS = 200;
+/** Máximo de resultados por búsqueda que permite Spotify desde febrero de 2026. */
+export const MAX_SEARCH_RESULTS = 10;
+
+export function spotifyTrackUrl(id: string): string {
+  return `https://open.spotify.com/track/${id}`;
+}
 
 const SPOTIFY_HOST = /^open\.spotify\.com$/i;
 const PATH = /^\/(?:intl-[a-z-]+\/)?(album|playlist|track|artist)\/([A-Za-z0-9]{22})/i;
@@ -24,7 +32,7 @@ export function parseSpotifyLink(url: URL): { type: SpotifyLinkType; id: string 
   return { type: match[1].toLowerCase() as SpotifyLinkType, id: match[2] };
 }
 
-export interface SpotifyAlbumTrack {
+export interface SpotifyTrack {
   id: string;
   title: string;
   author: string;
@@ -35,12 +43,28 @@ export interface SpotifyAlbum {
   name: string;
   artist: string;
   artworkUrl: string | null;
-  tracks: SpotifyAlbumTrack[];
+  tracks: SpotifyTrack[];
+}
+
+interface ApiTrack {
+  id: string | null;
+  name: string;
+  duration_ms: number;
+  artists: { name: string }[];
 }
 
 interface TrackPage {
-  items: { id: string | null; name: string; duration_ms: number; artists: { name: string }[] }[];
+  items: ApiTrack[];
   next: string | null;
+}
+
+function toTrack(item: ApiTrack & { id: string }): SpotifyTrack {
+  return {
+    id: item.id,
+    title: item.name,
+    author: item.artists.map((artist) => artist.name).join(', '),
+    durationMs: item.duration_ms,
+  };
 }
 
 export class SpotifyError extends Error {
@@ -59,8 +83,23 @@ export class SpotifyClient {
   constructor(
     private readonly clientId: string,
     private readonly clientSecret: string,
+    /** País del catálogo (ISO 3166-1 alfa-2): filtra temas no disponibles en esa región. */
+    private readonly market: string,
     private readonly fetchFn: typeof fetch = fetch,
   ) {}
+
+  async searchTracks(query: string, limit = MAX_SEARCH_RESULTS): Promise<SpotifyTrack[]> {
+    const params = new URLSearchParams({
+      q: query,
+      type: 'track',
+      limit: String(Math.min(limit, MAX_SEARCH_RESULTS)),
+      market: this.market,
+    });
+    const result = await this.get<{ tracks: { items: ApiTrack[] } }>(`${API_URL}/search?${params}`);
+    return result.tracks.items.flatMap((item) =>
+      item.id ? [toTrack({ ...item, id: item.id })] : [],
+    );
+  }
 
   private async getToken(): Promise<string> {
     // Margen de 60 s para no usar un token a punto de vencer.
@@ -102,17 +141,11 @@ export class SpotifyClient {
       tracks: TrackPage;
     }>(`${API_URL}/albums/${encodeURIComponent(id)}`);
 
-    const tracks: SpotifyAlbumTrack[] = [];
+    const tracks: SpotifyTrack[] = [];
     let page: TrackPage | null = album.tracks;
     while (page) {
       for (const item of page.items) {
-        if (!item.id) continue; // temas no disponibles en el catálogo
-        tracks.push({
-          id: item.id,
-          title: item.name,
-          author: item.artists.map((artist) => artist.name).join(', '),
-          durationMs: item.duration_ms,
-        });
+        if (item.id) tracks.push(toTrack({ ...item, id: item.id })); // sin id: no disponible
       }
       page =
         page.next && tracks.length < MAX_ALBUM_TRACKS ? await this.get<TrackPage>(page.next) : null;

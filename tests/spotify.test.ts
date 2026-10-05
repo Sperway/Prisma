@@ -53,7 +53,7 @@ describe('SpotifyClient.getAlbum', () => {
       return json({ items: [track('b', 'Aerodynamic')], next: null });
     });
 
-    const client = new SpotifyClient('id', 'secret', fetchFn);
+    const client = new SpotifyClient('id', 'secret', 'AR', fetchFn);
     const album = await client.getAlbum(ID);
 
     expect(album).toMatchObject({
@@ -74,9 +74,33 @@ describe('SpotifyClient.getAlbum', () => {
         ? json({ access_token: 'tok', expires_in: 3600 })
         : json({ error: { status: 403 } }, 403),
     );
-    const error = await new SpotifyClient('id', 'secret', fetchFn).getAlbum(ID).catch((e) => e);
+    const error = await new SpotifyClient('id', 'secret', 'AR', fetchFn)
+      .getAlbum(ID)
+      .catch((e) => e);
     expect(error).toBeInstanceOf(SpotifyError);
     expect(error.status).toBe(403);
+  });
+});
+
+describe('SpotifyClient.searchTracks', () => {
+  it('busca temas en el mercado configurado y descarta los no disponibles', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async (input) =>
+      String(input).includes('accounts')
+        ? json({ access_token: 'tok', expires_in: 3600 })
+        : json({ tracks: { items: [track('a', 'Mariposa Tecknicolor'), track(null, 'X')] } }),
+    );
+    const results = await new SpotifyClient('id', 'secret', 'AR', fetchFn).searchTracks(
+      'fito paez',
+      50,
+    );
+
+    expect(results).toEqual([
+      { id: 'a', title: 'Mariposa Tecknicolor', author: 'Daft Punk', durationMs: 200_000 },
+    ]);
+    const searchUrl = new URL(String(fetchFn.mock.calls[1]?.[0]));
+    expect(searchUrl.searchParams.get('q')).toBe('fito paez');
+    expect(searchUrl.searchParams.get('market')).toBe('AR');
+    expect(searchUrl.searchParams.get('limit')).toBe('10'); // tope de Spotify
   });
 });
 

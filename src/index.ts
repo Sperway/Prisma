@@ -9,7 +9,7 @@ import { createLogger } from './logger.js';
 import { createAutoLeave } from './music/autoLeave.js';
 import { createMusicManager } from './music/manager.js';
 import { SpotifyClient } from './music/spotify.js';
-import { createSuggestionProvider } from './music/suggestions.js';
+import { createSearch, createSuggestionProvider } from './music/suggestions.js';
 import { VERSION } from './version.js';
 
 async function main(): Promise<void> {
@@ -32,15 +32,22 @@ async function main(): Promise<void> {
   });
 
   const music = createMusicManager(client, config, logger);
+  const spotify =
+    config.SPOTIFY_ENABLED && config.SPOTIFY_CLIENT_ID && config.SPOTIFY_CLIENT_SECRET
+      ? new SpotifyClient(
+          config.SPOTIFY_CLIENT_ID,
+          config.SPOTIFY_CLIENT_SECRET,
+          config.SPOTIFY_MARKET,
+        )
+      : null;
+  const search = createSearch(music, spotify, logger);
   const ctx: BotContext = {
     config,
     logger,
     music,
-    spotify:
-      config.SPOTIFY_ENABLED && config.SPOTIFY_CLIENT_ID && config.SPOTIFY_CLIENT_SECRET
-        ? new SpotifyClient(config.SPOTIFY_CLIENT_ID, config.SPOTIFY_CLIENT_SECRET)
-        : null,
-    suggest: createSuggestionProvider(music, logger),
+    spotify,
+    search,
+    suggest: createSuggestionProvider(search, logger),
     startedAt: new Date(),
     commands: buildCommandMap(allCommands),
   };

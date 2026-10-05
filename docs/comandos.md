@@ -29,7 +29,9 @@ Para usar la música tenés que estar en un canal de voz. Para controlar algo qu
 
 ### Búsqueda con sugerencias
 
-Al escribir `/play`, Prisma muestra hasta 10 resultados de SoundCloud mientras tipeás (por ejemplo, `/play fito`). Elegí uno de la lista para reproducir exactamente ese tema, o apretá Enter para reproducir el primer resultado. Si pegás un enlace, no se muestran sugerencias.
+Al escribir `/play`, Prisma muestra hasta 10 resultados mientras tipeás (por ejemplo, `/play fito`). Los resultados salen del **catálogo de Spotify**, que es mucho más completo; si Spotify no está disponible, salen de SoundCloud. Elegí uno de la lista para reproducir exactamente ese tema, o apretá Enter para reproducir el primer resultado. Si pegás un enlace, no se muestran sugerencias.
+
+El audio se busca en SoundCloud con el título y el artista, así que en algunos temas puede sonar otra versión (en vivo, remasterizada o subida por un usuario).
 
 ### Panel de control
 

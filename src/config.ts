@@ -21,6 +21,10 @@ const EnvSchema = z.object({
   SPOTIFY_ENABLED: z.stringbool().default(false),
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
+  SPOTIFY_MARKET: z
+    .string()
+    .regex(/^[A-Z]{2}$/, 'debe ser un código de país de 2 letras (p. ej. AR)')
+    .default('AR'),
 });
 
 const ConfigSchema = EnvSchema.superRefine((env, ctx) => {
