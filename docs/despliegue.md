@@ -11,7 +11,13 @@
 | Acceso    | `ssh sperway-vps` (usuario `ubuntu`, en el grupo `docker`) |
 | Ubicación | `~/prisma`                                                 |
 
-Presupuesto de recursos de Prisma (todas las fases): **6 GB de RAM y 3 CPU como máximo**. Hoy, en la fase 1, son 512 MB y 1 CPU.
+Presupuesto de recursos de Prisma (todas las fases): **6 GB de RAM y 3 CPU como máximo**.
+
+| Servicio   | RAM máx. | CPU máx. |
+| ---------- | -------- | -------- |
+| `bot`      | 512 MB   | 1        |
+| `lavalink` | 1 GB     | 1,5      |
+| **Total**  | 1,5 GB   | 2,5      |
 
 ## Primera instalación
 
@@ -43,7 +49,7 @@ git clone github-prisma:Sperway/Prisma.git ~/prisma
 cd ~/prisma
 cp .env.example .env
 chmod 600 .env
-nano .env   # DISCORD_TOKEN y DISCORD_GUILD_ID
+nano .env   # DISCORD_TOKEN, DISCORD_GUILD_ID y LAVALINK_PASSWORD (openssl rand -hex 24)
 ```
 
 ### 3. Levantar
@@ -84,6 +90,7 @@ Para volver a la última versión: `git checkout main && git pull --ff-only` y o
 | --------------------------------- | --------------------------------------------------------------------- |
 | Estado y salud                    | `docker compose ps`                                                   |
 | Logs en vivo                      | `docker compose logs -f bot`                                          |
+| Logs de Lavalink                  | `docker compose logs -f lavalink`                                     |
 | Consumo de recursos               | `docker stats --no-stream $(docker compose ps -q)`                    |
 | Reiniciar                         | `docker compose restart bot`                                          |
 | Detener (solo Prisma)             | `docker compose down`                                                 |

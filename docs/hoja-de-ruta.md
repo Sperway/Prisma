@@ -9,13 +9,13 @@
 - Docker Compose aislado y endurecido para la VPS compartida
 - Documentación y ADRs
 
-## 🔜 Fase 2 — Música
+## ✅ Fase 2 — Música
 
-- Lavalink v4 como servicio aparte (con límites de memoria)
-- Fuentes: YouTube (plugin `youtube-source`), Spotify, SoundCloud y Deezer (LavaSrc)
-- Cola, pausa, saltar, volumen, repetir, mezclar
+- Lavalink 4.2 como servicio aparte (1 GB de RAM como máximo), con soporte del cifrado DAVE
+- Fuentes: SoundCloud (búsqueda por defecto), Bandcamp, Twitch y Vimeo; Spotify opcional. Sin YouTube ([ADR 0005](adr/0005-fuentes-de-musica.md))
+- `/play`, `/pausa`, `/saltar`, `/detener`, `/sonando`, `/cola`, `/quitar`, `/volumen`, `/repetir`, `/mezclar`
 - Panel con botones en el canal
-- Salida automática cuando el canal queda vacío
+- Salida automática cuando termina la cola o el canal queda vacío
 
 ## 🔜 Fase 3 — Voz (prueba de concepto y luego producción)
 

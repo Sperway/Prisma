@@ -1,7 +1,7 @@
 # Prisma corre en una VPS compartida con otro proyecto crítico.
 # Todo lo de acá está pensado para que Prisma NUNCA pueda afectarlo:
 #   - Proyecto, red y volúmenes propios (nombre "prisma").
-#   - Sin puertos publicados: el bot solo hace conexiones salientes.
+#   - Sin puertos publicados: los servicios solo se ven entre sí y salen a internet.
 #   - Límites duros de memoria, CPU y procesos.
 #   - oom_score_adj alto: si el servidor se queda sin RAM, el kernel mata primero a Prisma.
 # Ver docs/adr/0003-aislamiento-en-la-vps.md
@@ -25,9 +25,38 @@ services:
     build: .
     image: prisma-bot:latest
     env_file: .env
+    environment:
+      LAVALINK_HOST: lavalink
     read_only: true
     tmpfs: [/tmp]
     mem_limit: 512m
     memswap_limit: 512m
     cpus: 1.0
     pids_limit: 256
+    depends_on:
+      lavalink:
+        condition: service_started
+
+  lavalink:
+    <<: *hardening
+    build: ./lavalink
+    image: prisma-lavalink:latest
+    # Solo las variables que Lavalink necesita (el token de Discord no llega a este contenedor).
+    environment:
+      _JAVA_OPTIONS: -Xmx512m -XX:+UseG1GC
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD:?Falta LAVALINK_PASSWORD en .env}
+      SPOTIFY_ENABLED: ${SPOTIFY_ENABLED:-false}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+    read_only: true
+    # Java extrae librerías nativas (audio, cifrado DAVE) en /tmp: necesita permiso de ejecución.
+    tmpfs: ['/tmp:exec,size=128m']
+    volumes:
+      - lavalink-plugins:/opt/Lavalink/plugins
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.5
+    pids_limit: 512
+
+volumes:
+  lavalink-plugins:

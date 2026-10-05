@@ -1,12 +1,22 @@
 import { MessageFlags, type Interaction } from 'discord.js';
 import type { BotContext } from '../commands/types.js';
+import { handleMusicButton } from '../music/buttons.js';
 import { errorEmbed } from '../ui/embeds.js';
 
 export async function handleInteraction(interaction: Interaction, ctx: BotContext): Promise<void> {
-  if (!interaction.isChatInputCommand()) return;
-
   // Prisma es de un único servidor privado: ignora cualquier otro origen (incluidos DMs).
   if (interaction.guildId !== ctx.config.DISCORD_GUILD_ID) return;
+
+  if (interaction.isButton()) {
+    try {
+      await handleMusicButton(interaction, ctx.music, ctx.logger);
+    } catch (error) {
+      ctx.logger.error({ err: error, button: interaction.customId }, 'Error en botón');
+    }
+    return;
+  }
+
+  if (!interaction.isChatInputCommand()) return;
 
   const command = ctx.commands.get(interaction.commandName);
   if (!command) {

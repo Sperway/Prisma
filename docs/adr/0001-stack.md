@@ -22,5 +22,5 @@ Prisma necesita comandos, reproducción de música estable las 24 horas y, sobre
 ## Consecuencias
 
 - Lavalink suma un contenedor Java (unos 512 MB a 1 GB de RAM), que entra en el presupuesto de la VPS.
-- YouTube cambia seguido sus protecciones y el plugin `youtube-source` necesitará actualizaciones periódicas.
+- Las fuentes de música se definen en el [ADR 0005](0005-fuentes-de-musica.md).
 - Usamos **TypeScript 6.0** y no la 7.0 hasta que `typescript-eslint` la soporte.
