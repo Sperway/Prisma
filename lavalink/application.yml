@@ -1,0 +1,63 @@
+# Configuración de Lavalink para Prisma.
+# Referencia: https://lavalink.dev/configuration/
+# Los valores ${VAR:defecto} se leen del entorno (archivo .env vía compose.yaml).
+
+server:
+  port: 2333
+  address: 0.0.0.0
+
+lavalink:
+  plugins:
+    - dependency: 'com.github.topi314.lavasrc:lavasrc-plugin:4.8.3'
+      repository: 'https://maven.lavalink.dev/releases'
+  server:
+    password: '${LAVALINK_PASSWORD}'
+    sources:
+      youtube: false # Decisión del proyecto: sin YouTube
+      soundcloud: true
+      bandcamp: true
+      twitch: true
+      vimeo: true
+      nico: false
+      # Desactivado por seguridad: permitiría que cualquiera haga que la VPS descargue URLs
+      # arbitrarias, exponiendo su IP real (que Sperway protege detrás de Cloudflare).
+      http: false
+      local: false
+    youtubeSearchEnabled: false
+    soundcloudSearchEnabled: true
+    # SoundCloud devuelve fragmentos de 30 s para temas de pago (Go+): se descartan.
+    soundcloudFilterOutPreviewTracks: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    playerUpdateInterval: 5
+    gc-warnings: true
+
+plugins:
+  lavasrc:
+    # Spotify solo da metadatos; el audio se busca en SoundCloud.
+    providers:
+      - 'scsearch:%QUERY%'
+    sources:
+      spotify: ${SPOTIFY_ENABLED:false}
+      applemusic: false
+      deezer: false
+      yandexmusic: false
+      youtube: false
+    spotify:
+      clientId: '${SPOTIFY_CLIENT_ID:}'
+      clientSecret: '${SPOTIFY_CLIENT_SECRET:}'
+      countryCode: 'AR'
+      playlistLoadLimit: 2 # páginas de 100 temas
+      albumLoadLimit: 2
+
+metrics:
+  prometheus:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO

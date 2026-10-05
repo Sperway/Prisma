@@ -15,6 +15,8 @@ export async function handleReady(client: Client<true>, ctx: BotContext): Promis
   const { logger, config } = ctx;
   logger.info({ user: client.user.tag }, 'Conectado a Discord');
 
+  await ctx.music.init({ id: client.user.id, username: client.user.username });
+
   // Salir de cualquier servidor que no sea el nuestro (por si alguien obtuvo la invitación).
   for (const guild of client.guilds.cache.values()) {
     if (guild.id !== config.DISCORD_GUILD_ID) {

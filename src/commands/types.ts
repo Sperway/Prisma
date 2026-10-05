@@ -4,11 +4,13 @@ import type {
 } from 'discord.js';
 import type { Config } from '../config.js';
 import type { Logger } from '../logger.js';
+import type { MusicManager } from '../music/manager.js';
 
 /** Dependencias compartidas que reciben todos los comandos. */
 export interface BotContext {
   config: Config;
   logger: Logger;
+  music: MusicManager;
   startedAt: Date;
   commands: ReadonlyMap<string, Command>;
 }

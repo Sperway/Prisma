@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../src/config.js';
 
-const valid = { DISCORD_TOKEN: 'token', DISCORD_GUILD_ID: '123456789012345678' };
+const valid = {
+  DISCORD_TOKEN: 'token',
+  DISCORD_GUILD_ID: '123456789012345678',
+  LAVALINK_PASSWORD: 'una-clave-larga-de-prueba',
+};
 
 describe('loadConfig', () => {
   it('acepta una configuración mínima y aplica valores por defecto', () => {

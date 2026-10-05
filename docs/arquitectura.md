@@ -13,7 +13,7 @@ flowchart LR
 
     subgraph VPS["VPS — proyecto Docker «prisma»"]
         BOT[bot<br/>Node.js + discord.js]
-        LL[Lavalink<br/>fase 2]
+        LL[Lavalink]
         PG[(PostgreSQL + pgvector<br/>fase 4)]
         TTS[Piper TTS<br/>fase 3]
         LOCAL[IA local de respaldo<br/>fase 3-4]
@@ -46,7 +46,15 @@ src/
 ├── commands/
 │   ├── types.ts           Contratos Command y BotContext
 │   ├── index.ts           Registro central de comandos
-│   └── *.ts               Un archivo por comando
+│   ├── music/             Comandos de música
+│   └── *.ts               Comandos generales
+├── music/
+│   ├── manager.ts         Conexión con Lavalink, eventos de reproducción y panel
+│   ├── panel.ts           Embed de "sonando ahora" y botones de control
+│   ├── buttons.ts         Acciones de los botones del panel
+│   ├── guards.ts          Validaciones comunes (canal de voz, reproductor activo)
+│   ├── autoLeave.ts       Salida automática cuando el canal queda vacío
+│   └── format.ts          Formato de duraciones, barra de progreso y enlaces
 ├── events/
 │   ├── ready.ts           Al conectar: seguridad de servidores y registro de comandos
 │   └── interactionCreate.ts  Despacho de slash commands con manejo de errores
@@ -61,6 +69,33 @@ src/
 - **Fallar rápido.** La configuración se valida al arrancar; un error de configuración corta el proceso con un mensaje claro en lugar de fallar a mitad de camino.
 - **Salud sin puertos.** El estado del bot se informa a Docker escribiendo un latido en `/tmp`, sin abrir ningún puerto HTTP.
 - **Errores contenidos.** Un comando que falla responde un mensaje amable al usuario y queda registrado en el log; no tumba el bot. Una excepción no capturada sí termina el proceso, porque el estado es desconocido, y Docker lo reinicia limpio.
+
+## Música
+
+El bot no procesa el audio de la música: le pide a **Lavalink** que busque y reproduzca, y Lavalink manda el audio directo a Discord.
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant B as Bot
+    participant L as Lavalink
+    participant D as Discord (voz)
+
+    U->>B: /play consulta
+    B->>L: Búsqueda (scsearch o enlace)
+    L-->>B: Temas
+    B->>B: Agrega a la cola
+    B->>D: Entra al canal de voz (gateway)
+    D-->>B: Datos de la sesión de voz
+    B->>L: Sesión de voz + reproducir
+    L->>D: Audio Opus (UDP, cifrado DAVE)
+    L-->>B: Eventos (empezó, terminó, error)
+    B->>U: Panel "sonando ahora" con botones
+```
+
+- La cola vive en memoria, dentro del bot: si el bot se reinicia, la cola se pierde.
+- Si Lavalink se reinicia, el bot se reconecta solo cada 10 segundos.
+- La contraseña entre el bot y Lavalink es interna: Lavalink no publica ningún puerto.
 
 ## Pipeline de voz (diseño previsto para la fase 3)
 

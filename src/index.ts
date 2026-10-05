@@ -6,6 +6,8 @@ import { handleInteraction } from './events/interactionCreate.js';
 import { handleReady } from './events/ready.js';
 import { startHeartbeat } from './health.js';
 import { createLogger } from './logger.js';
+import { createAutoLeave } from './music/autoLeave.js';
+import { createMusicManager } from './music/manager.js';
 import { VERSION } from './version.js';
 
 async function main(): Promise<void> {
@@ -27,9 +29,11 @@ async function main(): Promise<void> {
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
   });
 
+  const music = createMusicManager(client, config, logger);
   const ctx: BotContext = {
     config,
     logger,
+    music,
     startedAt: new Date(),
     commands: buildCommandMap(allCommands),
   };
@@ -45,6 +49,7 @@ async function main(): Promise<void> {
     logger.warn({ guild: guild.id, name: guild.name }, 'Servidor no autorizado: saliendo');
     void guild.leave();
   });
+  client.on(Events.VoiceStateUpdate, createAutoLeave(client, music, logger));
   client.on(Events.Warn, (message) => logger.warn(message));
   client.on(Events.Error, (error) => logger.error({ err: error }, 'Error del cliente de Discord'));
 
