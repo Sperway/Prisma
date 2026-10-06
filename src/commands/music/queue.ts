@@ -1,11 +1,8 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { formatDuration } from '../../music/format.js';
 import { replyError, requireActivePlayer, requireGuild } from '../../music/guards.js';
-import { trackLink } from '../../music/panel.js';
+import { queueEmbed, trackLink } from '../../music/panel.js';
 import { brandEmbed } from '../../ui/embeds.js';
 import type { Command } from '../types.js';
-
-const PAGE_SIZE = 10;
 
 export const cola: Command = {
   data: new SlashCommandBuilder()
@@ -25,33 +22,8 @@ export const cola: Command = {
       return;
     }
 
-    const tracks = player.queue.tracks;
-    const pages = Math.max(1, Math.ceil(tracks.length / PAGE_SIZE));
-    const page = Math.min(interaction.options.getInteger('pagina') ?? 1, pages);
-    const start = (page - 1) * PAGE_SIZE;
-
-    const lines = tracks
-      .slice(start, start + PAGE_SIZE)
-      .map(
-        (track, i) =>
-          `\`${start + i + 1}.\` ${trackLink(track)} · ${formatDuration(track.info.duration ?? 0)}`,
-      );
-
     await interaction.reply({
-      embeds: [
-        brandEmbed()
-          .setTitle('📜 Cola')
-          .setDescription(
-            [
-              `**Sonando:** ${trackLink(current)}`,
-              '',
-              ...(lines.length ? lines : ['_Nada más en cola._']),
-            ].join('\n'),
-          )
-          .setFooter({
-            text: `Página ${page}/${pages} · ${tracks.length} temas · ${formatDuration(player.queue.utils.totalDuration())} en total`,
-          }),
-      ],
+      embeds: [queueEmbed(player, interaction.options.getInteger('pagina') ?? 1)],
     });
   },
 };

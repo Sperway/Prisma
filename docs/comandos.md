@@ -35,15 +35,18 @@ El audio se busca en SoundCloud con el título y el artista, así que en algunos
 
 ### Panel de control
 
-Cada vez que arranca un tema, Prisma publica un panel con botones:
+Cada vez que arranca un tema, Prisma publica una tarjeta con la carátula, el título, una barra de progreso que se actualiza cada 15 segundos, el estado (volumen, repetición, temas en cola, fuente, quién lo pidió), el próximo tema y los controles:
 
-| Botón | Acción                                                |
-| ----- | ----------------------------------------------------- |
-| ⏸️ ▶️ | Pausar / reanudar                                     |
-| ⏭️    | Saltar                                                |
-| ⏹️    | Detener y salir                                       |
-| 🔁 🔂 | Rotar la repetición: desactivado → cola → tema actual |
-| 🔀    | Mezclar la cola                                       |
+| Botón | Acción                                                                  |
+| ----- | ----------------------------------------------------------------------- |
+| ⏮️    | Vuelve al tema anterior (si el actual pasó los 5 segundos, lo reinicia) |
+| ⏸️ ▶️ | Pausar / reanudar                                                       |
+| ⏭️    | Saltar                                                                  |
+| ⏹️    | Detener y salir                                                         |
+| 🔉 🔊 | Bajar / subir el volumen de a 10%                                       |
+| 🔁 🔂 | Rotar la repetición: desactivado → cola → tema actual                   |
+| 🔀    | Mezclar la cola                                                         |
+| 📜    | Ver la cola (solo lo ves vos)                                           |
 
 ### Qué se puede reproducir
 

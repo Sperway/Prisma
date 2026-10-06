@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { requireActivePlayer, requireGuild } from '../../music/guards.js';
 import { refreshPanel } from '../../music/manager.js';
-import { nowPlayingEmbed, REPEAT_LABELS, trackLink } from '../../music/panel.js';
+import { nowPlayingPanel, REPEAT_LABELS, trackLink } from '../../music/panel.js';
 import { brandEmbed } from '../../ui/embeds.js';
 import type { Command } from '../types.js';
 
@@ -70,7 +70,7 @@ export const sonando: Command = {
       await interaction.reply({ embeds: [brandEmbed().setDescription('No hay nada sonando.')] });
       return;
     }
-    await interaction.reply({ embeds: [nowPlayingEmbed(player, track, true)] });
+    await interaction.reply(nowPlayingPanel(player, track, { controls: false }));
   },
 };
 
