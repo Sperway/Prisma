@@ -21,15 +21,15 @@ describe('formatDuration', () => {
 });
 
 describe('progressBar', () => {
-  it('ubica el indicador según el avance', () => {
-    expect(progressBar(0, 100, 5)).toBe('🔘▬▬▬▬');
-    expect(progressBar(50, 100, 5)).toBe('▬▬🔘▬▬');
-    expect(progressBar(100, 100, 5)).toBe('▬▬▬▬🔘');
+  it('rellena según el avance', () => {
+    expect(progressBar(0, 100, 4)).toBe('▱▱▱▱');
+    expect(progressBar(50, 100, 4)).toBe('▰▰▱▱');
+    expect(progressBar(100, 100, 4)).toBe('▰▰▰▰');
   });
 
   it('no se rompe con duraciones inválidas', () => {
-    expect(progressBar(10, 0, 5)).toBe('▬▬▬▬▬');
-    expect(progressBar(500, 100, 5)).toBe('▬▬▬▬🔘');
+    expect(progressBar(10, 0, 4)).toBe('▱▱▱▱');
+    expect(progressBar(500, 100, 4)).toBe('▰▰▰▰');
   });
 });
 

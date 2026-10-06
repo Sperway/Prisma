@@ -11,12 +11,11 @@ export function formatDuration(ms: number): string {
     : `${minutes}:${seconds}`;
 }
 
-/** Barra de progreso de texto: "▬▬▬▬🔘▬▬▬▬▬". */
-export function progressBar(position: number, duration: number, size = 14): string {
-  if (duration <= 0) return '▬'.repeat(size);
-  const ratio = Math.min(1, Math.max(0, position / duration));
-  const index = Math.min(size - 1, Math.floor(ratio * size));
-  return '▬'.repeat(index) + '🔘' + '▬'.repeat(size - index - 1);
+/** Barra de progreso de texto: "▰▰▰▰▱▱▱▱▱▱". */
+export function progressBar(position: number, duration: number, size = 18): string {
+  const ratio = duration > 0 ? Math.min(1, Math.max(0, position / duration)) : 0;
+  const filled = Math.round(ratio * size);
+  return '▰'.repeat(filled) + '▱'.repeat(size - filled);
 }
 
 /** Recorta un texto para que entre en los límites de Discord. */

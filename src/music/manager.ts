@@ -3,11 +3,19 @@ import { LavalinkManager, type Player } from 'lavalink-client';
 import type { Config } from '../config.js';
 import type { Logger } from '../logger.js';
 import { brandEmbed, errorEmbed } from '../ui/embeds.js';
-import { controlsRow, nowPlayingEmbed, trackLink } from './panel.js';
+import { nowPlayingPanel, trackLink } from './panel.js';
 
 /** Si la cola termina y nadie agrega nada, Prisma se va del canal después de este tiempo. */
 export const IDLE_DISCONNECT_MS = 3 * 60_000;
 const PANEL_KEY = 'panelMessageId';
+/** Cada cuánto se actualiza la barra de progreso del panel mientras suena un tema. */
+export const PANEL_REFRESH_MS = 15_000;
+const progressTimers = new Map<string, NodeJS.Timeout>();
+
+function stopProgress(guildId: string): void {
+  clearInterval(progressTimers.get(guildId));
+  progressTimers.delete(guildId);
+}
 
 export type MusicManager = LavalinkManager;
 
@@ -18,6 +26,7 @@ function textChannelOf(client: Client, player: Player): SendableChannels | null 
 }
 
 async function deletePanel(client: Client, player: Player): Promise<void> {
+  stopProgress(player.guildId);
   const messageId = player.get<string | undefined>(PANEL_KEY);
   if (!messageId) return;
   player.set(PANEL_KEY, undefined);
@@ -31,12 +40,18 @@ export async function refreshPanel(client: Client, player: Player): Promise<void
   const track = player.queue.current;
   const channel = textChannelOf(client, player);
   if (!messageId || !track || !channel) return;
-  await channel.messages
-    .edit(messageId, {
-      embeds: [nowPlayingEmbed(player, track)],
-      components: [controlsRow(player)],
-    })
-    .catch(() => undefined);
+  await channel.messages.edit(messageId, nowPlayingPanel(player, track)).catch(() => undefined);
+}
+
+/** Mantiene la barra de progreso al día (no edita mientras está en pausa). */
+function startProgress(client: Client, player: Player): void {
+  stopProgress(player.guildId);
+  const timer = setInterval(() => {
+    if (player.paused || !player.playing) return;
+    void refreshPanel(client, player);
+  }, PANEL_REFRESH_MS);
+  timer.unref();
+  progressTimers.set(player.guildId, timer);
 }
 
 export function createMusicManager(client: Client, config: Config, logger: Logger): MusicManager {
@@ -82,9 +97,15 @@ export function createMusicManager(client: Client, config: Config, logger: Logge
       await deletePanel(client, player);
       const channel = textChannelOf(client, player);
       const message: Message | undefined = await channel
-        ?.send({ embeds: [nowPlayingEmbed(player, track)], components: [controlsRow(player)] })
-        .catch(() => undefined);
-      if (message) player.set(PANEL_KEY, message.id);
+        ?.send(nowPlayingPanel(player, track))
+        .catch((error: unknown) => {
+          log.warn({ err: error }, 'No se pudo publicar el panel');
+          return undefined;
+        });
+      if (message) {
+        player.set(PANEL_KEY, message.id);
+        startProgress(client, player);
+      }
     })
     .on('trackError', async (player, track, payload) => {
       log.warn({ guild: player.guildId, exception: payload.exception }, 'Error reproduciendo');
