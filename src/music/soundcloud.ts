@@ -17,7 +17,7 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_PROBES = 6;
 const MIN_SCORE = 0.35;
 /** Segundo intento (solo por título) cuando no aparece ninguna versión reproducible. */
-const FALLBACK_MIN_SCORE = 0.25;
+const FALLBACK_MIN_SCORE = 0.3;
 
 /** Palabras que indican una versión distinta de la original. */
 const VARIANT_WORDS = [
@@ -38,6 +38,20 @@ const VARIANT_WORDS = [
   'bit',
   'mashup',
   'bootleg',
+  'edit',
+  'mix',
+  'extended',
+  'retro',
+  'covers',
+  'tribute',
+  'tributo',
+  'ingles',
+  'english',
+  'motivation',
+  'workout',
+  'gym',
+  'type',
+  'beat',
 ];
 /** Palabras que no aportan para comparar títulos. */
 const NOISE_WORDS = new Set([
@@ -119,33 +133,48 @@ function coverage(wanted: string[], haystack: Set<string>): number {
   return wanted.filter((word) => haystack.has(word)).length / wanted.length;
 }
 
-/** Puntaje de 0 a 1 (puede ser negativo si es una variante no pedida). */
+/**
+ * Puntaje de 0 a 1 (puede ser negativo si es una variante no pedida):
+ * - 45 %: cuántas palabras del título pedido aparecen en el del candidato.
+ * - 20 %: si aparece el artista (en el título, el usuario o los metadatos del sello).
+ * - 15 %: cuántas palabras del candidato son "esperables" (título + artista): castiga títulos
+ *   con agregados como "gym motivation rocky…" o "dj edit extended".
+ * - 20 %: cercanía de la duración.
+ */
 export function scoreCandidate(query: TrackQuery, candidate: SoundCloudCandidate): number {
-  const titleWords = new Set(tokens(candidate.title));
-  const allWords = new Set([
-    ...titleWords,
+  const wantedTitle = tokens(simplifyTitle(query.title));
+  const wantedArtist = tokens(query.author?.split(',')[0] ?? '');
+  const allArtists = tokens(query.author ?? '');
+
+  const candidateTitle = tokens(candidate.title);
+  const titleWords = new Set(candidateTitle);
+  const uploaderWords = [
     ...tokens(candidate.user?.username ?? ''),
     ...tokens(candidate.publisher_metadata?.artist ?? ''),
-  ]);
+  ];
 
-  const firstArtist = query.author?.split(',')[0] ?? '';
-  let score = 0.6 * coverage(tokens(simplifyTitle(query.title)), titleWords);
-  score += 0.3 * coverage(tokens(firstArtist), allWords);
+  let score = 0.45 * coverage(wantedTitle, titleWords);
+  score += 0.2 * coverage(wantedArtist, new Set([...candidateTitle, ...uploaderWords]));
+
+  const expected = new Set([...wantedTitle, ...allArtists]);
+  const expectedShare =
+    candidateTitle.length === 0
+      ? 0
+      : candidateTitle.filter((word) => expected.has(word)).length / candidateTitle.length;
+  score += 0.15 * expectedShare;
 
   if (query.durationMs) {
     const diff = Math.abs(candidate.duration - query.durationMs);
-    score += 0.1 * (1 - Math.min(diff / 30_000, 1));
-    if (diff > 45_000) score -= 0.2; // probablemente otra versión o un fragmento
+    score += 0.2 * (1 - Math.min(diff / 20_000, 1));
+    if (diff > 30_000) score -= 0.2; // casi seguro otra versión, un fragmento o una mezcla
   } else {
-    score += 0.05;
+    score += 0.1;
   }
 
-  const wantedText = normalize(simplifyTitle(query.title));
-  const candidateText = normalize(candidate.title);
-  const unwantedVariant = VARIANT_WORDS.some(
-    (word) => candidateText.split(' ').includes(word) && !wantedText.split(' ').includes(word),
-  );
-  if (unwantedVariant) score -= 0.3;
+  // Variantes no pedidas: se buscan en el título y en el usuario ("oasis garage band cover").
+  const wanted = new Set(normalize(simplifyTitle(query.title)).split(' '));
+  const candidateWords = new Set([...normalize(candidate.title).split(' '), ...uploaderWords]);
+  if (VARIANT_WORDS.some((word) => candidateWords.has(word) && !wanted.has(word))) score -= 0.35;
 
   return score;
 }

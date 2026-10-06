@@ -46,6 +46,19 @@ describe('scoreCandidate', () => {
     expect(other).toBeLessThan(0.35);
   });
 
+  it('descarta mezclas, edits y covers frente al original', () => {
+    const original = scoreCandidate(query, candidate({}));
+    for (const title of [
+      'Mi Chain de Roque (DJ Edit Extended)',
+      'Mi Chain de Roque - Gym Motivation Mix',
+      'Mi Chain de Roque cover',
+    ]) {
+      expect(scoreCandidate(query, candidate({ title })), title).toBeLessThan(original - 0.3);
+    }
+    const byCoverBand = candidate({ user: { username: 'garage band cover' } });
+    expect(scoreCandidate(query, byCoverBand)).toBeLessThan(original - 0.3);
+  });
+
   it('penaliza remixes y versiones en vivo que no se pidieron', () => {
     const remix = scoreCandidate(query, candidate({ title: 'Mi Chain de Roque (Remix)' }));
     expect(remix).toBeLessThan(scoreCandidate(query, candidate({})));
@@ -61,7 +74,7 @@ describe('scoreCandidate', () => {
       { title: 'Mariposa Tecknicolor', author: 'Fito Páez' },
       candidate({ title: 'MARIPOSA TECKNICOLOR - Fito Paez', user: { username: 'fan' } }),
     );
-    expect(score).toBeGreaterThan(0.9);
+    expect(score).toBeGreaterThan(0.85);
   });
 });
 
