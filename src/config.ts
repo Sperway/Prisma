@@ -4,6 +4,12 @@ const snowflake = z
   .string({ error: 'es obligatorio' })
   .regex(/^\d{17,20}$/, 'debe ser un ID de Discord (17-20 dígitos)');
 
+/** Variable opcional: vacía ("CLAVE=") cuenta como no definida. */
+const optionalString = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().optional(),
+);
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -25,17 +31,35 @@ const EnvSchema = z.object({
     .string()
     .regex(/^[A-Z]{2}$/, 'debe ser un código de país de 2 letras (p. ej. AR)')
     .default('AR'),
+
+  // Voz e IA (opcional: sin VOICE_DISCORD_TOKEN, Prisma funciona solo con música)
+  VOICE_DISCORD_TOKEN: optionalString,
+  GROQ_API_KEY: optionalString,
+  GROQ_STT_MODEL: z.string().default('whisper-large-v3-turbo'),
+  GROQ_CHAT_MODEL: z.string().default('openai/gpt-oss-120b'),
+  TTS_URL: z.url().default('http://tts:5000'),
+  VOICE_WAKE_WORD: z.string().min(3).default('prisma'),
+  VOICE_IDLE_MINUTES: z.coerce.number().int().min(1).max(120).default(10),
 });
 
 const ConfigSchema = EnvSchema.superRefine((env, ctx) => {
-  if (!env.SPOTIFY_ENABLED) return;
-  for (const key of ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET'] as const) {
-    if (!env[key])
-      ctx.addIssue({
-        code: 'custom',
-        path: [key],
-        message: 'es obligatorio si SPOTIFY_ENABLED=true',
-      });
+  if (env.SPOTIFY_ENABLED) {
+    for (const key of ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET'] as const) {
+      if (!env[key]) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: 'es obligatorio si SPOTIFY_ENABLED=true',
+        });
+      }
+    }
+  }
+  if (env.VOICE_DISCORD_TOKEN && !env.GROQ_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['GROQ_API_KEY'],
+      message: 'es obligatorio si se configura VOICE_DISCORD_TOKEN',
+    });
   }
 });
 

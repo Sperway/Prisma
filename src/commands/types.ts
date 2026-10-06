@@ -9,6 +9,7 @@ import type { MusicManager } from '../music/manager.js';
 import type { SoundCloudResolver } from '../music/soundcloud.js';
 import type { SpotifyClient } from '../music/spotify.js';
 import type { Search, SuggestionProvider } from '../music/suggestions.js';
+import type { VoiceManager } from '../voice/manager.js';
 
 /** Dependencias compartidas que reciben todos los comandos. */
 export interface BotContext {
@@ -22,6 +23,8 @@ export interface BotContext {
   /** Búsqueda de temas: Spotify primero, SoundCloud como respaldo. */
   search: Search;
   suggest: SuggestionProvider;
+  /** null si la voz no está configurada. */
+  voice: VoiceManager | null;
   startedAt: Date;
   commands: ReadonlyMap<string, Command>;
 }

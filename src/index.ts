@@ -12,6 +12,7 @@ import { SoundCloudResolver } from './music/soundcloud.js';
 import { SpotifyClient } from './music/spotify.js';
 import { createSearch, createSuggestionProvider } from './music/suggestions.js';
 import { VERSION } from './version.js';
+import { VoiceManager } from './voice/manager.js';
 
 async function main(): Promise<void> {
   let config;
@@ -51,6 +52,19 @@ async function main(): Promise<void> {
     soundcloud,
     search,
     suggest: createSuggestionProvider(search, logger),
+    voice:
+      config.VOICE_DISCORD_TOKEN && config.GROQ_API_KEY
+        ? new VoiceManager(
+            {
+              ...config,
+              VOICE_DISCORD_TOKEN: config.VOICE_DISCORD_TOKEN,
+              GROQ_API_KEY: config.GROQ_API_KEY,
+            },
+            client,
+            music,
+            logger,
+          )
+        : null,
     startedAt: new Date(),
     commands: buildCommandMap(allCommands),
   };
@@ -78,6 +92,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     logger.info({ signal }, 'Apagando Prisma');
     stopHeartbeat();
+    await ctx.voice?.destroy();
     await client.destroy();
     process.exit(0);
   };
@@ -91,6 +106,11 @@ async function main(): Promise<void> {
   });
 
   await client.login(config.DISCORD_TOKEN);
+  if (ctx.voice) {
+    await ctx.voice.start();
+  } else {
+    logger.info('Voz desactivada (falta VOICE_DISCORD_TOKEN o GROQ_API_KEY)');
+  }
 }
 
 await main();
