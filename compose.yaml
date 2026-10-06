@@ -36,6 +36,8 @@ services:
     depends_on:
       lavalink:
         condition: service_healthy
+      tts:
+        condition: service_started
 
   lavalink:
     <<: *hardening
@@ -52,3 +54,20 @@ services:
     memswap_limit: 1g
     cpus: 1.5
     pids_limit: 512
+
+  # Texto a voz (Piper). Solo trabaja mientras Prisma habla; el resto del tiempo está en reposo.
+  tts:
+    <<: *hardening
+    build:
+      context: ./tts
+      args:
+        PIPER_VOICE: ${PIPER_VOICE:-es_AR-daniela-high}
+    image: prisma-tts:latest
+    environment:
+      PIPER_LENGTH_SCALE: ${PIPER_LENGTH_SCALE:-0.95}
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 2.0
+    pids_limit: 128

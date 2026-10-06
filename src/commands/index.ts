@@ -4,6 +4,7 @@ import { detener, mezclar, pausa, repetir, saltar, sonando, volumen } from './mu
 import { play } from './music/play.js';
 import { cola, quitar } from './music/queue.js';
 import { ping } from './ping.js';
+import { callar, charlar } from './voice.js';
 import type { Command } from './types.js';
 
 /** Registro central: para agregar un comando, crealo en esta carpeta y sumalo acá. */
@@ -23,6 +24,9 @@ export const allCommands: readonly Command[] = [
   volumen,
   repetir,
   mezclar,
+  // Voz
+  charlar,
+  callar,
 ];
 
 export function buildCommandMap(commands: readonly Command[]): ReadonlyMap<string, Command> {
