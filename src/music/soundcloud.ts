@@ -16,6 +16,8 @@ const REQUEST_TIMEOUT_MS = 8_000;
 /** Cuántos candidatos se prueban como máximo (cada prueba es una consulta a SoundCloud). */
 const MAX_PROBES = 6;
 const MIN_SCORE = 0.35;
+/** Segundo intento (solo por título) cuando no aparece ninguna versión reproducible. */
+const FALLBACK_MIN_SCORE = 0.25;
 
 /** Palabras que indican una versión distinta de la original. */
 const VARIANT_WORDS = [
@@ -83,10 +85,24 @@ export interface SoundCloudCandidate {
   media?: { transcodings?: Transcoding[] };
 }
 
+/**
+ * Quita del título lo que agrega Spotify y no suele estar en SoundCloud:
+ * "Here Comes The Sun - Remastered 2009" → "Here Comes The Sun",
+ * "Tema (feat. Alguien)" → "Tema", "Bzrp Music Sessions, Vol. 52/66" → "Bzrp Music Sessions, Vol. 52".
+ */
+export function simplifyTitle(title: string): string {
+  return title
+    .replace(/\s*[([](?:feat|ft|with|con)\.?\s[^)\]]*[)\]]/gi, '')
+    .replace(/\s*[([][^)\]]*(?:remaster|version|versión|edit|mono|stereo)[^)\]]*[)\]]/gi, '')
+    .replace(/\s+-\s+.*(?:remaster|version|versión|edit|mono|stereo|from|de la película).*$/i, '')
+    .replace(/\s*\/\s*\d+\b/g, '')
+    .trim();
+}
+
 export function normalize(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
@@ -113,7 +129,7 @@ export function scoreCandidate(query: TrackQuery, candidate: SoundCloudCandidate
   ]);
 
   const firstArtist = query.author?.split(',')[0] ?? '';
-  let score = 0.6 * coverage(tokens(query.title), titleWords);
+  let score = 0.6 * coverage(tokens(simplifyTitle(query.title)), titleWords);
   score += 0.3 * coverage(tokens(firstArtist), allWords);
 
   if (query.durationMs) {
@@ -124,7 +140,7 @@ export function scoreCandidate(query: TrackQuery, candidate: SoundCloudCandidate
     score += 0.05;
   }
 
-  const wantedText = normalize(query.title);
+  const wantedText = normalize(simplifyTitle(query.title));
   const candidateText = normalize(candidate.title);
   const unwantedVariant = VARIANT_WORDS.some(
     (word) => candidateText.split(' ').includes(word) && !wantedText.split(' ').includes(word),
@@ -210,12 +226,15 @@ export class SoundCloudResolver {
     }
   }
 
-  /** Devuelve el enlace de la mejor versión reproducible, o null si no hay ninguna. */
-  async findPlayable(query: TrackQuery): Promise<string | null> {
-    const text = [query.title, query.author?.split(',')[0]].filter(Boolean).join(' ');
+  /** Elige el mejor candidato reproducible de una búsqueda. */
+  private async bestPlayable(
+    text: string,
+    query: TrackQuery,
+    minScore: number,
+  ): Promise<string | null> {
     const candidates = (await this.search(text))
       .map((candidate) => ({ candidate, score: scoreCandidate(query, candidate) }))
-      .filter(({ score }) => score >= MIN_SCORE)
+      .filter(({ score }) => score >= minScore)
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX_PROBES);
 
@@ -223,7 +242,18 @@ export class SoundCloudResolver {
     const playable = await Promise.all(
       candidates.map(({ candidate }) => this.isPlayable(candidate)),
     );
-    const best = candidates.find((_, i) => playable[i]);
-    return best?.candidate.permalink_url ?? null;
+    return candidates.find((_, i) => playable[i])?.candidate.permalink_url ?? null;
+  }
+
+  /** Devuelve el enlace de la mejor versión reproducible, o null si no hay ninguna. */
+  async findPlayable(query: TrackQuery): Promise<string | null> {
+    const title = simplifyTitle(query.title);
+    const withArtist = [title, query.author?.split(',')[0]].filter(Boolean).join(' ');
+    return (
+      (await this.bestPlayable(withArtist, query, MIN_SCORE)) ??
+      // Si la versión oficial no es reproducible, suele haber subidas de usuarios con otro
+      // formato de título: se busca solo por título y con un criterio más flexible.
+      (withArtist === title ? null : await this.bestPlayable(title, query, FALLBACK_MIN_SCORE))
+    );
   }
 }

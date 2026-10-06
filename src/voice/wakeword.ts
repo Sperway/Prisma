@@ -3,7 +3,7 @@
 function normalizeWord(word: string): string {
   return word
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[^a-z0-9ñ]/g, '');
 }

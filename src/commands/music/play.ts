@@ -1,6 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import type { Track, UnresolvedTrack } from 'lavalink-client';
-import { catalogTrack, type CatalogTrack } from '../../music/catalog.js';
+import { catalogTrack, NoPlayableVersionError, type CatalogTrack } from '../../music/catalog.js';
 import { isYouTubeUrl, parseUrl, truncate } from '../../music/format.js';
 import { replyError, requireGuild } from '../../music/guards.js';
 import { toRequester, trackLink } from '../../music/panel.js';
@@ -159,9 +159,31 @@ export const play: Command = {
     }
 
     const wasIdle = !player.playing && !player.queue.current;
-    await player.queue.add(tracks);
-
     const [first] = tracks;
+
+    // Si no hay nada sonando, el primer tema se resuelve ya: si no se puede reproducir, se
+    // avisa en la respuesta (y no con un error en el canal después).
+    if (wasIdle && first && ctx.music.utils.isUnresolvedTrack(first)) {
+      try {
+        await first.resolve(player);
+      } catch (error) {
+        const known = error instanceof NoPlayableVersionError;
+        ctx.logger.warn({ err: error, query }, 'No se pudo resolver el primer tema');
+        if (tracks.length === 1) {
+          if (!player.queue.current) await player.destroy('Tema no reproducible');
+          await replyError(
+            interaction,
+            known
+              ? `No encontré una versión de **${truncate(first.info.title, 80)}** que se pueda reproducir. Probá con otra versión o con otro tema.`
+              : 'No pude cargar ese tema. Probá de nuevo.',
+          );
+          return;
+        }
+        tracks.shift(); // de un álbum: se saltea el primero y sigue el resto
+      }
+    }
+
+    await player.queue.add(tracks);
     const description =
       collectionName !== null
         ? `📃 Agregué **${tracks.length} temas** de **${truncate(collectionName, 80)}**.`
@@ -170,6 +192,14 @@ export const play: Command = {
           : `➕ Agregué **${first ? trackLink(first) : ''}** a la cola (posición ${player.queue.tracks.length}).`;
     await interaction.editReply({ embeds: [brandEmbed().setDescription(description)] });
 
-    if (wasIdle) await player.play();
+    if (wasIdle) {
+      try {
+        await player.play();
+      } catch (error) {
+        // Si ningún tema de la cola se pudo resolver, la librería no tiene qué reproducir.
+        ctx.logger.warn({ err: error, query }, 'No se pudo iniciar la reproducción');
+        if (!player.queue.current) await player.destroy('Nada reproducible');
+      }
+    }
   },
 };

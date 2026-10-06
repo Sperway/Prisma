@@ -3,6 +3,7 @@ import { LavalinkManager, type Player } from 'lavalink-client';
 import type { Config } from '../config.js';
 import type { Logger } from '../logger.js';
 import { brandEmbed, errorEmbed } from '../ui/embeds.js';
+import { NoPlayableVersionError } from './catalog.js';
 import { nowPlayingPanel, trackLink } from './panel.js';
 
 /** Si la cola termina y nadie agrega nada, Prisma se va del canal después de este tiempo. */
@@ -110,10 +111,25 @@ export function createMusicManager(client: Client, config: Config, logger: Logge
       }
     })
     .on('trackError', async (player, track, payload) => {
-      log.warn({ guild: player.guildId, exception: payload.exception }, 'Error reproduciendo');
+      // Si falló la resolución (buscar la versión en SoundCloud), la librería pasa el Error;
+      // si falló Lavalink al reproducir, pasa el evento con "exception".
+      const resolveError =
+        (payload as unknown) instanceof Error ? (payload as unknown as Error) : null;
+      log.warn(
+        {
+          guild: player.guildId,
+          title: track?.info.title,
+          ...(resolveError ? { err: resolveError } : { exception: payload.exception }),
+        },
+        'Error reproduciendo',
+      );
       const name = track ? trackLink(track) : 'el tema';
+      const reason =
+        resolveError instanceof NoPlayableVersionError
+          ? `No encontré una versión reproducible de ${name}.`
+          : `No pude reproducir ${name}.`;
       await textChannelOf(client, player)
-        ?.send({ embeds: [errorEmbed(`No pude reproducir ${name}. Paso al siguiente.`)] })
+        ?.send({ embeds: [errorEmbed(`${reason} Paso al siguiente.`)] })
         .catch(() => undefined);
     })
     .on('trackStuck', (player, track) =>

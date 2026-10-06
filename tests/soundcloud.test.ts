@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   pickLavaplayerFormat,
   scoreCandidate,
+  simplifyTitle,
   SoundCloudResolver,
   type SoundCloudCandidate,
 } from '../src/music/soundcloud.js';
@@ -107,5 +108,19 @@ describe('SoundCloudResolver.findPlayable', () => {
     const fetchFn = fakeSoundCloud([onlyAac], ['https://api/aac']);
     const url = await new SoundCloudResolver(fetchFn).findPlayable({ title: 'Mi Chain de Roque' });
     expect(url).toBeNull();
+  });
+});
+
+describe('simplifyTitle', () => {
+  it.each([
+    ['Here Comes The Sun - Remastered 2009', 'Here Comes The Sun'],
+    ['Tema (feat. Alguien)', 'Tema'],
+    ['Tema [with Otro]', 'Tema'],
+    ['Song (2015 Remaster)', 'Song'],
+    ['Quevedo: Bzrp Music Sessions, Vol. 52/66', 'Quevedo: Bzrp Music Sessions, Vol. 52'],
+    ['Mariposa Tecknicolor', 'Mariposa Tecknicolor'],
+    ['Tema (Remix)', 'Tema (Remix)'],
+  ])('%s → %s', (input, expected) => {
+    expect(simplifyTitle(input)).toBe(expected);
   });
 });
