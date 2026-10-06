@@ -112,3 +112,13 @@ describe('persona y texto hablado', () => {
     expect(prompt).toContain('Mariposa Tecknicolor — Fito Páez');
   });
 });
+
+describe('primer fragmento corto', () => {
+  it('parte una primera oración larga en la primera coma', () => {
+    const text =
+      '¡Claro, Matías! Poné The End de The Doors, tiene esa vibra que te pega justo ahora y te va a encantar. Después seguimos.';
+    const [first, second] = splitSentences(text);
+    expect(first).toBe('¡Claro, Matías! Poné The End de The Doors,');
+    expect(second).toBe('tiene esa vibra que te pega justo ahora y te va a encantar.');
+  });
+});

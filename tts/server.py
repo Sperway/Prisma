@@ -16,9 +16,13 @@ import subprocess
 import time
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from threading import Lock
 
+import onnxruntime
 from piper import PiperVoice, SynthesisConfig
+from piper.config import PiperConfig
+from piper.voice import ESPEAK_DATA_DIR
 
 VOICE = os.environ.get("PIPER_VOICE", "es_AR-daniela-high")
 VOICES_DIR = os.environ.get("PIPER_VOICES_DIR", "/voices")
@@ -26,15 +30,36 @@ PORT = int(os.environ.get("PORT", "5000"))
 # Velocidad del habla: < 1 más rápido, > 1 más lento.
 LENGTH_SCALE = float(os.environ.get("PIPER_LENGTH_SCALE", "0.95"))
 MAX_TEXT_LENGTH = 1000
+# Hilos de ONNX Runtime: tienen que coincidir con las CPU del contenedor. Por defecto usa todos
+# los núcleos de la VPS (8) y, con el límite de CPU de Docker, va el doble de lento.
+THREADS = int(os.environ.get("PIPER_THREADS", "2"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("tts")
 
-voice = PiperVoice.load(os.path.join(VOICES_DIR, f"{VOICE}.onnx"))
+def load_voice() -> PiperVoice:
+    model = os.path.join(VOICES_DIR, f"{VOICE}.onnx")
+    with open(f"{model}.json", encoding="utf-8") as config_file:
+        config = PiperConfig.from_dict(json.load(config_file))
+    options = onnxruntime.SessionOptions()
+    options.intra_op_num_threads = THREADS
+    options.inter_op_num_threads = 1
+    session = onnxruntime.InferenceSession(
+        model, sess_options=options, providers=["CPUExecutionProvider"]
+    )
+    return PiperVoice(
+        config=config,
+        session=session,
+        espeak_data_dir=Path(ESPEAK_DATA_DIR),
+        download_dir=Path("/tmp"),
+    )
+
+
+voice = load_voice()
 syn_config = SynthesisConfig(length_scale=LENGTH_SCALE)
 # ONNX Runtime ya usa varios hilos por síntesis: de a una por vez evita saturar la CPU compartida.
 synth_lock = Lock()
-log.info("Voz cargada: %s (%d Hz)", VOICE, voice.config.sample_rate)
+log.info("Voz cargada: %s (%d Hz, %d hilos)", VOICE, voice.config.sample_rate, THREADS)
 
 
 def synthesize_ogg(text: str) -> bytes:

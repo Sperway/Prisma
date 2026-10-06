@@ -65,9 +65,10 @@ services:
     image: prisma-tts:latest
     environment:
       PIPER_LENGTH_SCALE: ${PIPER_LENGTH_SCALE:-0.95}
+      PIPER_THREADS: 3 # igual a "cpus"
     read_only: true
     tmpfs: [/tmp]
     mem_limit: 768m
     memswap_limit: 768m
-    cpus: 2.0
+    cpus: 3.0
     pids_limit: 128

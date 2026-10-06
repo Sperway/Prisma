@@ -17,6 +17,7 @@ export function buildSystemPrompt({ speaker, nowPlaying, now }: PromptContext): 
     'Cómo hablás:',
     '- Español rioplatense, con voseo, cálida, con humor y sin formalidades.',
     '- Respuestas cortas: una a tres oraciones, como en una charla real. Solo te extendés si te lo piden.',
+    '- Empezá con una frase breve (por ejemplo, una reacción) y después desarrollá: así respondés más rápido.',
     '- Nada de markdown, listas, emojis, enlaces ni símbolos: solo texto que suene natural en voz alta.',
     '- Los números, siglas y abreviaturas, escribilos como se dicen.',
     '- Si no sabés algo o no lo podés hacer, decilo con naturalidad. No inventes datos.',
@@ -34,6 +35,8 @@ export function buildSystemPrompt({ speaker, nowPlaying, now }: PromptContext): 
 
 /** Oraciones más cortas que esto se juntan con la siguiente (evita cortes antinaturales). */
 const MIN_SENTENCE_LENGTH = 25;
+/** Si la primera oración es más larga, se parte en una coma: así el primer audio sale antes. */
+const MAX_FIRST_CHUNK = 70;
 
 /**
  * Divide el texto en oraciones para sintetizar y reproducir de a una: la primera suena mientras
@@ -48,6 +51,14 @@ export function splitSentences(text: string): string[] {
       sentences[sentences.length - 1] = `${last} ${part}`;
     } else {
       sentences.push(part);
+    }
+  }
+
+  const [first, ...rest] = sentences;
+  if (first && first.length > MAX_FIRST_CHUNK) {
+    const comma = first.indexOf(', ', MIN_SENTENCE_LENGTH);
+    if (comma !== -1 && comma < first.length - MIN_SENTENCE_LENGTH) {
+      return [first.slice(0, comma + 1), first.slice(comma + 2), ...rest];
     }
   }
   return sentences;

@@ -87,7 +87,9 @@ export class VoiceSession {
     try {
       transcript = await this.deps.stt.transcribe(muxOggOpus(packets), {
         language: 'es',
-        prompt: `Conversación con Prisma.`,
+        // Orienta a Whisper con el nombre y vocabulario frecuente del grupo.
+        prompt:
+          'Conversación en español rioplatense con Prisma, en Discord. Música, rock nacional, temas, Spotify.',
       });
     } catch (error) {
       this.log.warn({ err: error }, 'Falló la transcripción');
