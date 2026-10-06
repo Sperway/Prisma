@@ -166,3 +166,28 @@ describe('simplifyTitle', () => {
     expect(simplifyTitle(input)).toBe(expected);
   });
 });
+
+describe('mashups', () => {
+  it('detecta " x " en temas de un solo artista, pero no en colaboraciones', () => {
+    const solo = { title: 'Blinding Lights', author: 'The Weeknd', durationMs: 200_000 };
+    const real = scoreCandidate(
+      solo,
+      candidate({ title: 'Blinding Lights', user: { username: 'The Weeknd' }, duration: 200_000 }),
+    );
+    const mashup = scoreCandidate(
+      solo,
+      candidate({
+        title: 'BLINDING LIGHTS x FLASHING LIGHTS',
+        user: { username: 'dj' },
+        duration: 200_000,
+      }),
+    );
+    expect(mashup).toBeLessThan(0.6);
+    expect(real).toBeGreaterThan(0.9);
+
+    const collab = { title: 'Fvck Luv', author: 'Duki, C.R.O', durationMs: 180_000 };
+    expect(scoreCandidate(collab, candidate({ title: 'DUKI x C.R.O - FVCK LUV' }))).toBeGreaterThan(
+      0.6,
+    );
+  });
+});

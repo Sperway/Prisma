@@ -53,6 +53,10 @@ const VARIANT_WORDS = [
   'gym',
   'type',
   'beat',
+  'free',
+  'download',
+  'dl',
+  'ingls',
 ];
 /** Palabras que no aportan para comparar títulos. */
 const NOISE_WORDS = new Set([
@@ -175,6 +179,8 @@ export function scoreCandidate(query: TrackQuery, candidate: SoundCloudCandidate
       ? 0
       : candidateTitle.filter((word) => expected.has(word)).length / candidateTitle.length;
   score += 0.15 * expectedShare;
+  // Muchas palabras ajenas a lo pedido: casi seguro un mashup, un mix o un video recopilatorio.
+  if (expectedShare < 0.6) score -= 0.2;
 
   if (query.durationMs) {
     const diff = Math.abs(candidate.duration - query.durationMs);
@@ -187,7 +193,12 @@ export function scoreCandidate(query: TrackQuery, candidate: SoundCloudCandidate
   // Variantes no pedidas: se buscan en el título y en el usuario ("oasis garage band cover").
   const wanted = new Set(normalize(simplifyTitle(query.title)).split(' '));
   const candidateWords = new Set([...normalize(candidate.title).split(' '), ...uploaderWords]);
-  if (VARIANT_WORDS.some((word) => candidateWords.has(word) && !wanted.has(word))) score -= 0.35;
+  // " x " junta artistas: válido en colaboraciones ("Duki x C.R.O"), pero si el tema es de un
+  // solo artista indica un mashup ("Blinding Lights x Flashing Lights").
+  const singleArtist = (query.author ?? '').split(',').length === 1;
+  const isMashup = candidateTitle.includes('x') && !wanted.has('x') && singleArtist;
+  const hasVariant = VARIANT_WORDS.some((word) => candidateWords.has(word) && !wanted.has(word));
+  if (hasVariant || isMashup) score -= 0.35;
 
   return score;
 }
