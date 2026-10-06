@@ -54,6 +54,7 @@ src/
 │   ├── buttons.ts         Acciones de los botones del panel
 │   ├── guards.ts          Validaciones comunes (canal de voz, reproductor activo)
 │   ├── autoLeave.ts       Salida automática cuando el canal queda vacío
+│   ├── spotify.ts         Lector de álbumes de Spotify (la API actual no lo deja a LavaSrc)
 │   └── format.ts          Formato de duraciones, barra de progreso y enlaces
 ├── events/
 │   ├── ready.ts           Al conectar: seguridad de servidores y registro de comandos
