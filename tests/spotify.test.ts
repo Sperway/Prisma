@@ -95,7 +95,13 @@ describe('SpotifyClient.searchTracks', () => {
     );
 
     expect(results).toEqual([
-      { id: 'a', title: 'Mariposa Tecknicolor', author: 'Daft Punk', durationMs: 200_000 },
+      {
+        id: 'a',
+        title: 'Mariposa Tecknicolor',
+        author: 'Daft Punk',
+        durationMs: 200_000,
+        artworkUrl: null,
+      },
     ]);
     const searchUrl = new URL(String(fetchFn.mock.calls[1]?.[0]));
     expect(searchUrl.searchParams.get('q')).toBe('fito paez');

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../src/logger.js';
-import type { MusicManager } from '../src/music/manager.js';
+import type { SoundCloudResolver } from '../src/music/soundcloud.js';
 import type { SpotifyClient } from '../src/music/spotify.js';
 import { createSearch, toChoice, type SearchHit } from '../src/music/suggestions.js';
 
@@ -11,12 +11,13 @@ const hit = (overrides: Partial<SearchHit> = {}): SearchHit => ({
   author: 'Fito Páez',
   durationMs: 245_000,
   isStream: false,
+  artworkUrl: null,
   url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',
   ...overrides,
 });
 
 describe('toChoice', () => {
-  it('muestra título, autor y duración, y envía el enlace', () => {
+  it('muestra título, autor y duración, y envía el enlace de Spotify', () => {
     expect(toChoice(hit())).toEqual({
       name: 'Mariposa Tecknicolor — Fito Páez (4:05)',
       value: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',
@@ -36,23 +37,23 @@ describe('toChoice', () => {
   it('marca las transmisiones en vivo', () => {
     expect(toChoice(hit({ isStream: true })).name).toContain('(en vivo)');
   });
+
+  it('las opciones de SoundCloud envían texto para que /play busque una versión reproducible', () => {
+    expect(toChoice(hit({ url: null })).value).toBe('Mariposa Tecknicolor Fito Páez');
+  });
 });
 
 describe('createSearch', () => {
-  const soundcloudTrack = {
-    info: {
-      title: 'Tema en SoundCloud',
-      author: 'Alguien',
-      duration: 180_000,
-      isStream: false,
-      uri: 'https://soundcloud.com/alguien/tema',
-    },
-  };
-  const music = {
-    nodeManager: {
-      leastUsedNodes: () => [{ search: vi.fn(async () => ({ tracks: [soundcloudTrack] })) }],
-    },
-  } as unknown as MusicManager;
+  const soundcloud = {
+    search: vi.fn(async () => [
+      {
+        title: 'Tema en SoundCloud',
+        duration: 180_000,
+        permalink_url: 'https://soundcloud.com/a/t',
+        user: { username: 'Alguien' },
+      },
+    ]),
+  } as unknown as SoundCloudResolver;
 
   const spotifyWith = (impl: () => Promise<unknown>) =>
     ({ searchTracks: vi.fn(impl) }) as unknown as SpotifyClient;
@@ -64,10 +65,14 @@ describe('createSearch', () => {
         title: 'Mariposa Tecknicolor',
         author: 'Fito Páez',
         durationMs: 245_000,
+        artworkUrl: 'https://img/a.jpg',
       },
     ]);
-    const [first] = await createSearch(music, spotify, logger)('fito');
-    expect(first?.url).toBe('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
+    const [first] = await createSearch(soundcloud, spotify, logger)('fito');
+    expect(first).toMatchObject({
+      url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',
+      artworkUrl: 'https://img/a.jpg',
+    });
   });
 
   it('cae a SoundCloud si Spotify falla, no encuentra nada o no está configurado', async () => {
@@ -76,8 +81,8 @@ describe('createSearch', () => {
     });
     const empty = spotifyWith(async () => []);
     for (const spotify of [failing, empty, null]) {
-      const [first] = await createSearch(music, spotify, logger)('fito');
-      expect(first?.url).toBe('https://soundcloud.com/alguien/tema');
+      const [first] = await createSearch(soundcloud, spotify, logger)('fito');
+      expect(first).toMatchObject({ title: 'Tema en SoundCloud', author: 'Alguien', url: null });
     }
   });
 });

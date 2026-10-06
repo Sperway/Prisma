@@ -74,6 +74,8 @@ export function createMusicManager(client: Client, config: Config, logger: Logge
     queueOptions: { maxPreviousTracks: 10 },
     playerOptions: {
       defaultSearchPlatform: 'scsearch',
+      // Los temas del catálogo conservan título, artista y carátula de Spotify al resolverse.
+      useUnresolvedData: true,
       // Si alguien desconecta a Prisma del canal, se respeta: se destruye el reproductor.
       onDisconnect: { destroyPlayer: true },
       onEmptyQueue: { destroyAfterMs: IDLE_DISCONNECT_MS },
