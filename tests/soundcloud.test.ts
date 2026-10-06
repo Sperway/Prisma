@@ -55,7 +55,10 @@ describe('scoreCandidate', () => {
     ]) {
       expect(scoreCandidate(query, candidate({ title })), title).toBeLessThan(original - 0.3);
     }
-    const byCoverBand = candidate({ user: { username: 'garage band cover' } });
+    const byCoverBand = candidate({
+      user: { username: 'The Best of Duki' },
+      permalink_url: 'https://soundcloud.com/duki-garage-band-cover/mi-chain',
+    });
     expect(scoreCandidate(query, byCoverBand)).toBeLessThan(original - 0.3);
   });
 
@@ -106,12 +109,36 @@ describe('SoundCloudResolver.findPlayable', () => {
     });
     const fetchFn = fakeSoundCloud([official, alternative], ['https://api/alt-mp3']);
 
-    const url = await new SoundCloudResolver(fetchFn).findPlayable({
+    const match = await new SoundCloudResolver(fetchFn).findPlayable({
       title: 'Mi Chain de Roque',
       author: 'Duki',
       durationMs: 180_000,
     });
-    expect(url).toBe('https://soundcloud.com/alternativa');
+    expect(match).toMatchObject({ url: 'https://soundcloud.com/alternativa', exact: true });
+  });
+
+  it('si solo hay remixes reproducibles, usa el mejor y lo marca como alternativo', async () => {
+    const official = candidate({
+      permalink_url: 'https://soundcloud.com/oficial',
+      media: { transcodings: [hls('audio/mpeg', 'https://api/oficial')] },
+    });
+    const remix = candidate({
+      title: 'Mi Chain de Roque (Guaracha Remix)',
+      permalink_url: 'https://soundcloud.com/dj/remix',
+      user: { username: 'DJ' },
+      media: { transcodings: [hls('audio/mpeg', 'https://api/remix')] },
+    });
+    const fetchFn = fakeSoundCloud([official, remix], ['https://api/remix']);
+    const match = await new SoundCloudResolver(fetchFn).findPlayable({
+      title: 'Mi Chain de Roque',
+      author: 'Duki',
+      durationMs: 180_000,
+    });
+    expect(match).toMatchObject({
+      url: 'https://soundcloud.com/dj/remix',
+      title: 'Mi Chain de Roque (Guaracha Remix)',
+      exact: false,
+    });
   });
 
   it('devuelve null si ninguna versión se puede reproducir', async () => {
@@ -119,8 +146,10 @@ describe('SoundCloudResolver.findPlayable', () => {
       media: { transcodings: [hls('audio/mp4; codecs="mp4a.40.2"', 'https://api/aac')] },
     });
     const fetchFn = fakeSoundCloud([onlyAac], ['https://api/aac']);
-    const url = await new SoundCloudResolver(fetchFn).findPlayable({ title: 'Mi Chain de Roque' });
-    expect(url).toBeNull();
+    const match = await new SoundCloudResolver(fetchFn).findPlayable({
+      title: 'Mi Chain de Roque',
+    });
+    expect(match).toBeNull();
   });
 });
 

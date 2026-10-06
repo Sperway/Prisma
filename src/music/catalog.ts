@@ -39,19 +39,28 @@ export function catalogTrack(
 
   const resolveFromUri = track.resolve;
   track.resolve = async function (this: UnresolvedTrack, player: Player) {
-    const url = await soundcloud.findPlayable({
+    const match = await soundcloud.findPlayable({
       title: meta.title,
       ...(meta.author && { author: meta.author }),
       ...(meta.durationMs && { durationMs: meta.durationMs }),
     });
-    if (!url)
+    if (!match)
       throw new NoPlayableVersionError(`No hay una versión reproducible de "${meta.title}"`);
 
     // La librería resuelve buscando info.uri: se le pasa el enlace de SoundCloud elegido y,
     // ya resuelto, se vuelve a mostrar el enlace original.
-    this.info.uri = url;
+    this.info.uri = match.url;
     await resolveFromUri.call(this, player);
-    if (meta.displayUri) (this as unknown as Track).info.uri = meta.displayUri;
+
+    const resolved = this as unknown as Track;
+    if (match.exact) {
+      if (meta.displayUri) resolved.info.uri = meta.displayUri;
+    } else {
+      // Versión alternativa: se muestra su título real (y su enlace) para no confundir.
+      resolved.info.title = match.title;
+      resolved.info.author = match.author || resolved.info.author;
+      resolved.userData = { ...resolved.userData, alternative: 1 };
+    }
   };
 
   return track;

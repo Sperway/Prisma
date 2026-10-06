@@ -15,9 +15,10 @@ const CLIENT_ID_TTL_MS = 6 * 60 * 60_000;
 const REQUEST_TIMEOUT_MS = 8_000;
 /** Cuántos candidatos se prueban como máximo (cada prueba es una consulta a SoundCloud). */
 const MAX_PROBES = 6;
+/** Puntaje mínimo para considerar un candidato. */
 const MIN_SCORE = 0.35;
-/** Segundo intento (solo por título) cuando no aparece ninguna versión reproducible. */
-const FALLBACK_MIN_SCORE = 0.3;
+/** Desde este puntaje es "la misma versión"; por debajo, una versión alternativa (remix, cover…). */
+export const EXACT_SCORE = 0.6;
 
 /** Palabras que indican una versión distinta de la original. */
 const VARIANT_WORDS = [
@@ -76,6 +77,15 @@ const NOISE_WORDS = new Set([
   'de',
   'y',
 ]);
+
+export interface PlayableMatch {
+  url: string;
+  title: string;
+  author: string;
+  score: number;
+  /** false: es una versión alternativa (remix, cover, en vivo…) porque no hay otra reproducible. */
+  exact: boolean;
+}
 
 export interface TrackQuery {
   title: string;
@@ -148,9 +158,12 @@ export function scoreCandidate(query: TrackQuery, candidate: SoundCloudCandidate
 
   const candidateTitle = tokens(candidate.title);
   const titleWords = new Set(candidateTitle);
+  // El enlace también delata al usuario: "The Best of Oasis" → soundcloud.com/oasis-garage-band-cover.
+  const uploaderSlug = candidate.permalink_url.split('/')[3] ?? '';
   const uploaderWords = [
     ...tokens(candidate.user?.username ?? ''),
     ...tokens(candidate.publisher_metadata?.artist ?? ''),
+    ...tokens(uploaderSlug),
   ];
 
   let score = 0.45 * coverage(wantedTitle, titleWords);
@@ -255,15 +268,11 @@ export class SoundCloudResolver {
     }
   }
 
-  /** Elige el mejor candidato reproducible de una búsqueda. */
-  private async bestPlayable(
-    text: string,
-    query: TrackQuery,
-    minScore: number,
-  ): Promise<string | null> {
+  /** El mejor candidato reproducible de una búsqueda (por puntaje), o null. */
+  private async bestPlayable(text: string, query: TrackQuery): Promise<PlayableMatch | null> {
     const candidates = (await this.search(text))
       .map((candidate) => ({ candidate, score: scoreCandidate(query, candidate) }))
-      .filter(({ score }) => score >= minScore)
+      .filter(({ score }) => score >= MIN_SCORE)
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX_PROBES);
 
@@ -271,18 +280,32 @@ export class SoundCloudResolver {
     const playable = await Promise.all(
       candidates.map(({ candidate }) => this.isPlayable(candidate)),
     );
-    return candidates.find((_, i) => playable[i])?.candidate.permalink_url ?? null;
+    const best = candidates.find((_, i) => playable[i]);
+    if (!best) return null;
+    return {
+      url: best.candidate.permalink_url,
+      title: best.candidate.title,
+      author: best.candidate.publisher_metadata?.artist ?? best.candidate.user?.username ?? '',
+      score: best.score,
+      exact: best.score >= EXACT_SCORE,
+    };
   }
 
-  /** Devuelve el enlace de la mejor versión reproducible, o null si no hay ninguna. */
-  async findPlayable(query: TrackQuery): Promise<string | null> {
+  /**
+   * La mejor versión reproducible: primero buscando por título y artista; si no aparece una
+   * exacta, también solo por título (las subidas de usuarios suelen tener otro formato).
+   * Si solo hay alternativas, devuelve la de mejor puntaje marcada como no exacta.
+   */
+  async findPlayable(query: TrackQuery): Promise<PlayableMatch | null> {
     const title = simplifyTitle(query.title);
     const withArtist = [title, query.author?.split(',')[0]].filter(Boolean).join(' ');
-    return (
-      (await this.bestPlayable(withArtist, query, MIN_SCORE)) ??
-      // Si la versión oficial no es reproducible, suele haber subidas de usuarios con otro
-      // formato de título: se busca solo por título y con un criterio más flexible.
-      (withArtist === title ? null : await this.bestPlayable(title, query, FALLBACK_MIN_SCORE))
-    );
+
+    const first = await this.bestPlayable(withArtist, query);
+    if (first?.exact || withArtist === title) return first;
+
+    const second = await this.bestPlayable(title, query);
+    if (!first) return second;
+    if (!second) return first;
+    return second.score > first.score ? second : first;
   }
 }

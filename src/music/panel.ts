@@ -145,6 +145,7 @@ export function nowPlayingPanel(
     ? '🔴  **En vivo**'
     : `\`${formatDuration(player.position)}\`  ${progressBar(player.position, info.duration)}  \`${formatDuration(info.duration)}\``;
 
+  const isAlternative = track.userData?.['alternative'] === 1;
   const status = [
     `🔊 ${player.volume}%`,
     `🔁 ${REPEAT_LABELS[player.repeatMode]}`,
@@ -152,6 +153,7 @@ export function nowPlayingPanel(
     SOURCE_LABELS[info.sourceName] ?? info.sourceName,
   ];
   if (track.requester) status.push(`Pedido por <@${track.requester.id}>`);
+  if (isAlternative) status.unshift('⚠️ Versión alternativa');
 
   const lines = [progress, `-# ${status.join('  ·  ')}`];
   const [next] = player.queue.tracks;
