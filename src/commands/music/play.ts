@@ -1,5 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import type { Track, UnresolvedTrack } from 'lavalink-client';
+import { catalogTrack, type CatalogTrack } from '../../music/catalog.js';
 import { isYouTubeUrl, parseUrl, truncate } from '../../music/format.js';
 import { replyError, requireGuild } from '../../music/guards.js';
 import { toRequester, trackLink } from '../../music/panel.js';
@@ -12,7 +13,7 @@ const MAX_QUERY_LENGTH = 300;
 export const play: Command = {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Reproduce un tema o playlist (SoundCloud, Spotify, Bandcamp, Twitch, Vimeo).')
+    .setDescription('Reproduce un tema o álbum (Spotify, SoundCloud, Bandcamp, Twitch, Vimeo).')
     .addStringOption((option) =>
       option
         .setName('consulta')
@@ -101,43 +102,49 @@ export const play: Command = {
     let collectionName: string | null = null;
     let failed = false;
 
-    if (spotifyLink?.type === 'album' && ctx.spotify) {
-      // LavaSrc no puede cargar álbumes con la API actual de Spotify: se leen acá y cada tema
-      // se resuelve (Spotify → SoundCloud) recién cuando le toca sonar.
-      try {
+    const fromCatalog = (meta: CatalogTrack) =>
+      catalogTrack(ctx.music, ctx.soundcloud, meta, requester);
+
+    try {
+      if (spotifyLink?.type === 'album' && ctx.spotify) {
         const album = await ctx.spotify.getAlbum(spotifyLink.id);
         collectionName = `${album.name} — ${album.artist}`;
         tracks = album.tracks.map((track) =>
-          ctx.music.utils.buildUnresolvedTrack(
-            {
-              title: track.title,
-              author: track.author,
-              duration: track.durationMs,
-              uri: spotifyTrackUrl(track.id),
-              artworkUrl: album.artworkUrl,
-              sourceName: 'spotify',
-            },
-            requester,
-          ),
+          fromCatalog({ ...track, displayUri: spotifyTrackUrl(track.id) }),
         );
-      } catch (error) {
-        ctx.logger.warn(
-          { err: error, album: spotifyLink.id },
-          'No se pudo cargar el álbum de Spotify',
-        );
-        failed = true;
-      }
-    } else {
-      // Texto libre: se elige el mejor resultado (catálogo de Spotify si está activo).
-      const target = url ? query : ((await ctx.search(query))[0]?.url ?? query);
-      const result = await player.search({ query: target }, requester);
-      failed = result.loadType === 'error';
-      if (result.loadType === 'playlist') {
-        tracks = result.tracks;
-        collectionName = result.playlist?.name ?? 'la playlist';
+      } else if (spotifyLink?.type === 'track' && ctx.spotify) {
+        const track = await ctx.spotify.getTrack(spotifyLink.id);
+        tracks = [fromCatalog({ ...track, displayUri: spotifyTrackUrl(track.id) })];
+      } else if (url) {
+        // Otros enlaces (SoundCloud, Bandcamp, Twitch, Vimeo): los carga Lavalink directamente.
+        const result = await player.search({ query }, requester);
+        failed = result.loadType === 'error';
+        if (result.loadType === 'playlist') {
+          tracks = result.tracks;
+          collectionName = result.playlist?.name ?? 'la playlist';
+        } else {
+          tracks = result.tracks.slice(0, 1);
+        }
       } else {
-        tracks = result.tracks.slice(0, 1);
+        // Texto libre: el mejor resultado del catálogo (Spotify, o SoundCloud como respaldo).
+        const [top] = await ctx.search(query);
+        tracks = [
+          fromCatalog(
+            top
+              ? {
+                  title: top.title,
+                  author: top.author,
+                  durationMs: top.durationMs,
+                  artworkUrl: top.artworkUrl,
+                  ...(top.url && { displayUri: top.url }),
+                }
+              : { title: query },
+          ),
+        ];
       }
+    } catch (error) {
+      ctx.logger.warn({ err: error, query }, 'No se pudo cargar la consulta');
+      failed = true;
     }
 
     if (tracks.length === 0) {

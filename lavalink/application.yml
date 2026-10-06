@@ -7,9 +7,6 @@ server:
   address: 0.0.0.0
 
 lavalink:
-  plugins:
-    - dependency: 'com.github.topi314.lavasrc:lavasrc-plugin:4.8.3'
-      repository: 'https://maven.lavalink.dev/releases'
   server:
     password: '${LAVALINK_PASSWORD}'
     sources:
@@ -35,23 +32,8 @@ lavalink:
     playerUpdateInterval: 5
     gc-warnings: true
 
-plugins:
-  lavasrc:
-    # Spotify solo da metadatos; el audio se busca en SoundCloud.
-    providers:
-      - 'scsearch:%QUERY%'
-    sources:
-      spotify: ${SPOTIFY_ENABLED:false}
-      applemusic: false
-      deezer: false
-      yandexmusic: false
-      youtube: false
-    spotify:
-      clientId: '${SPOTIFY_CLIENT_ID:}'
-      clientSecret: '${SPOTIFY_CLIENT_SECRET:}'
-      countryCode: 'AR'
-      playlistLoadLimit: 2 # páginas de 100 temas
-      albumLoadLimit: 2
+# Spotify no se configura acá: el bot lee el catálogo de Spotify y elige la versión de
+# SoundCloud a reproducir (src/music/catalog.ts y src/music/soundcloud.ts).
 
 metrics:
   prometheus:

@@ -1,12 +1,10 @@
 /**
  * Cliente mínimo de la Web API de Spotify (credenciales de aplicación).
  *
- * Se usa para dos cosas:
- * - Buscar temas en el catálogo de Spotify (sugerencias de /play), mucho más completo que SoundCloud.
- * - Cargar álbumes. Existe porque, desde las restricciones de febrero de 2026, LavaSrc no puede cargar álbumes:
- * usa el endpoint de búsqueda en lote (GET /tracks?ids=), que Spotify eliminó. Acá leemos el
- * álbum con los endpoints que siguen disponibles y cada tema se resuelve recién al sonar.
- * Ver docs/adr/0005-fuentes-de-musica.md.
+ * Spotify aporta solo el catálogo (búsqueda, títulos, artistas, carátulas): nunca el audio.
+ * El audio se busca en SoundCloud (ver soundcloud.ts y catalog.ts).
+ * Solo usa endpoints disponibles para apps en modo desarrollo tras las restricciones de
+ * febrero de 2026. Ver docs/adr/0005-fuentes-de-musica.md.
  */
 
 const ACCOUNTS_URL = 'https://accounts.spotify.com/api/token';
@@ -37,6 +35,7 @@ export interface SpotifyTrack {
   title: string;
   author: string;
   durationMs: number;
+  artworkUrl: string | null;
 }
 
 export interface SpotifyAlbum {
@@ -51,6 +50,8 @@ interface ApiTrack {
   name: string;
   duration_ms: number;
   artists: { name: string }[];
+  /** Ausente en los temas que vienen dentro de un álbum. */
+  album?: { images: { url: string }[] };
 }
 
 interface TrackPage {
@@ -58,12 +59,13 @@ interface TrackPage {
   next: string | null;
 }
 
-function toTrack(item: ApiTrack & { id: string }): SpotifyTrack {
+function toTrack(item: ApiTrack & { id: string }, artworkUrl?: string | null): SpotifyTrack {
   return {
     id: item.id,
     title: item.name,
     author: item.artists.map((artist) => artist.name).join(', '),
     durationMs: item.duration_ms,
+    artworkUrl: artworkUrl ?? item.album?.images[0]?.url ?? null,
   };
 }
 
@@ -99,6 +101,13 @@ export class SpotifyClient {
     return result.tracks.items.flatMap((item) =>
       item.id ? [toTrack({ ...item, id: item.id })] : [],
     );
+  }
+
+  async getTrack(id: string): Promise<SpotifyTrack> {
+    const item = await this.get<ApiTrack & { id: string }>(
+      `${API_URL}/tracks/${encodeURIComponent(id)}?market=${this.market}`,
+    );
+    return toTrack(item);
   }
 
   private async getToken(): Promise<string> {
@@ -141,11 +150,12 @@ export class SpotifyClient {
       tracks: TrackPage;
     }>(`${API_URL}/albums/${encodeURIComponent(id)}`);
 
+    const artworkUrl = album.images[0]?.url ?? null;
     const tracks: SpotifyTrack[] = [];
     let page: TrackPage | null = album.tracks;
     while (page) {
       for (const item of page.items) {
-        if (item.id) tracks.push(toTrack({ ...item, id: item.id })); // sin id: no disponible
+        if (item.id) tracks.push(toTrack({ ...item, id: item.id }, artworkUrl)); // sin id: no disponible
       }
       page =
         page.next && tracks.length < MAX_ALBUM_TRACKS ? await this.get<TrackPage>(page.next) : null;
@@ -154,7 +164,7 @@ export class SpotifyClient {
     return {
       name: album.name,
       artist: album.artists.map((artist) => artist.name).join(', '),
-      artworkUrl: album.images[0]?.url ?? null,
+      artworkUrl,
       tracks: tracks.slice(0, MAX_ALBUM_TRACKS),
     };
   }

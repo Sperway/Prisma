@@ -6,6 +6,7 @@ import type {
 import type { Config } from '../config.js';
 import type { Logger } from '../logger.js';
 import type { MusicManager } from '../music/manager.js';
+import type { SoundCloudResolver } from '../music/soundcloud.js';
 import type { SpotifyClient } from '../music/spotify.js';
 import type { Search, SuggestionProvider } from '../music/suggestions.js';
 
@@ -16,6 +17,8 @@ export interface BotContext {
   music: MusicManager;
   /** null si Spotify no está configurado. */
   spotify: SpotifyClient | null;
+  /** Elige versiones de SoundCloud que Lavalink pueda reproducir. */
+  soundcloud: SoundCloudResolver;
   /** Búsqueda de temas: Spotify primero, SoundCloud como respaldo. */
   search: Search;
   suggest: SuggestionProvider;

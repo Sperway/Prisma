@@ -1,7 +1,7 @@
 import type { ApplicationCommandOptionChoiceData } from 'discord.js';
 import type { Logger } from '../logger.js';
 import { formatDuration, parseUrl, truncate } from './format.js';
-import type { MusicManager } from './manager.js';
+import type { SoundCloudResolver } from './soundcloud.js';
 import { spotifyTrackUrl, type SpotifyClient } from './spotify.js';
 
 /** Discord limita las opciones de autocompletado a 25, con nombre y valor de 100 caracteres. */
@@ -19,17 +19,22 @@ export interface SearchHit {
   author: string;
   durationMs: number;
   isStream: boolean;
-  /** Enlace que /play sabe reproducir. */
-  url: string;
+  artworkUrl: string | null;
+  /** Enlace de Spotify, o null si el resultado viene de SoundCloud. */
+  url: string | null;
 }
 
-/** Convierte un resultado en una opción: se muestra "Título — Autor (3:45)" y se envía el enlace. */
+/**
+ * Convierte un resultado en una opción: se muestra "Título — Autor (3:45)". Se envía el enlace de
+ * Spotify (si entra en el límite) o el texto, y /play busca la versión reproducible.
+ */
 export function toChoice(hit: SearchHit): ApplicationCommandOptionChoiceData<string> {
   const suffix = ` (${hit.isStream ? 'en vivo' : formatDuration(hit.durationMs)})`;
   const name = truncate(`${hit.title} — ${hit.author}`, MAX_LENGTH - suffix.length) + suffix;
-  // Si el enlace no entra en el límite, se envía el texto y /play vuelve a buscarlo.
   const value =
-    hit.url.length <= MAX_LENGTH ? hit.url : truncate(`${hit.title} ${hit.author}`, MAX_LENGTH);
+    hit.url && hit.url.length <= MAX_LENGTH
+      ? hit.url
+      : truncate(`${hit.title} ${hit.author}`, MAX_LENGTH);
   return { name, value };
 }
 
@@ -45,7 +50,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * Busca temas: primero en el catálogo de Spotify (más completo) y, si no está configurado,
  * falla o no encuentra nada, en SoundCloud.
  */
-export function createSearch(music: MusicManager, spotify: SpotifyClient | null, logger: Logger) {
+export function createSearch(
+  soundcloud: SoundCloudResolver,
+  spotify: SpotifyClient | null,
+  logger: Logger,
+) {
   const searchSpotify = async (query: string): Promise<SearchHit[]> => {
     if (!spotify) return [];
     try {
@@ -55,6 +64,7 @@ export function createSearch(music: MusicManager, spotify: SpotifyClient | null,
         author: track.author,
         durationMs: track.durationMs,
         isStream: false,
+        artworkUrl: track.artworkUrl,
         url: spotifyTrackUrl(track.id),
       }));
     } catch (error) {
@@ -64,15 +74,14 @@ export function createSearch(music: MusicManager, spotify: SpotifyClient | null,
   };
 
   const searchSoundCloud = async (query: string): Promise<SearchHit[]> => {
-    const node = music.nodeManager.leastUsedNodes('playingPlayers')[0];
-    if (!node) return [];
-    const result = await node.search({ query, source: 'scsearch' }, null);
-    return result.tracks.slice(0, MAX_CHOICES).map((track) => ({
-      title: track.info.title,
-      author: track.info.author,
-      durationMs: track.info.duration,
-      isStream: track.info.isStream,
-      url: track.info.uri,
+    const candidates = await soundcloud.search(query, MAX_CHOICES);
+    return candidates.map((candidate) => ({
+      title: candidate.title,
+      author: candidate.publisher_metadata?.artist ?? candidate.user?.username ?? '',
+      durationMs: candidate.duration,
+      isStream: false,
+      artworkUrl: null,
+      url: null,
     }));
   };
 

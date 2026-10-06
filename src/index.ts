@@ -8,6 +8,7 @@ import { startHeartbeat } from './health.js';
 import { createLogger } from './logger.js';
 import { createAutoLeave } from './music/autoLeave.js';
 import { createMusicManager } from './music/manager.js';
+import { SoundCloudResolver } from './music/soundcloud.js';
 import { SpotifyClient } from './music/spotify.js';
 import { createSearch, createSuggestionProvider } from './music/suggestions.js';
 import { VERSION } from './version.js';
@@ -40,12 +41,14 @@ async function main(): Promise<void> {
           config.SPOTIFY_MARKET,
         )
       : null;
-  const search = createSearch(music, spotify, logger);
+  const soundcloud = new SoundCloudResolver();
+  const search = createSearch(soundcloud, spotify, logger);
   const ctx: BotContext = {
     config,
     logger,
     music,
     spotify,
+    soundcloud,
     search,
     suggest: createSuggestionProvider(search, logger),
     startedAt: new Date(),
